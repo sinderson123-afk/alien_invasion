@@ -9,8 +9,13 @@ class Alien(Sprite):
         super().__init__()
         self.screen = ai_game.screen
 
-        # 加载外星人图像并设置其rect属性
+        # 加载外星人图像并缩放
         self.image = pygame.image.load('images/alien.bmp')
+        original_width, original_height = self.image.get_size()
+        # 将外星人宽度缩放到屏幕宽度的 6%
+        new_width = int(ai_game.screen.get_rect().width * 0.06)
+        new_height = int(original_height * (new_width / original_width))
+        self.image = pygame.transform.scale(self.image, (new_width, new_height))
         self.rect = self.image.get_rect()
 
         # 每个外星人最初都在屏幕的左上角附近
