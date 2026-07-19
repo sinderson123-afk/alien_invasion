@@ -9,7 +9,7 @@ class Ship:
         self.screen_rect = ai_game.screen.get_rect()
 
         # 加载飞船图像并缩放
-        self.image = pygame.image.load("images/ship.bmp")
+        self.image = pygame.image.load("resource/images/ship.bmp")
         original_width, original_height = self.image.get_size()
         # 将飞船宽度缩放到屏幕宽度的 8%
         new_width = int(self.screen_rect.width * 0.08)
@@ -27,6 +27,9 @@ class Ship:
         self.moving_right = False
         self.moving_left = False
 
+        # 受击闪烁计时器（帧数）
+        self.invulnerable_frames = 0
+
     def update(self):
         """根据移动标志更新飞船位置"""
         if self.moving_right and self.rect.right < self.screen_rect.right:
@@ -38,8 +41,13 @@ class Ship:
         self.rect.x = self.x
 
     def blitme(self):
-        """在指定位置绘制飞船"""
-        self.screen.blit(self.image,self.rect)
+        """在指定位置绘制飞船（受击时闪烁）"""
+        if self.invulnerable_frames > 0:
+            self.invulnerable_frames -= 1
+            # 每6帧切换一次可见性
+            if (self.invulnerable_frames // 6) % 2 == 0:
+                return
+        self.screen.blit(self.image, self.rect)
 
     def center_ship(self):
         """将飞船放在屏幕底部的中央"""

@@ -1,24 +1,43 @@
-import pygame
+"""爆炸粒子系统：支持尺寸/速度/颜色自定义"""
+
+import math
 import random
+import pygame
 from pygame.sprite import Sprite
 
-class Particle(Sprite):
-    """表示单个爆炸粒子的类"""
 
-    def __init__(self, ai_game, x, y):
-        """在指定的位置创建一个粒子"""
+class Particle(Sprite):
+    """表示单个爆炸粒子的类（支持倍率和自定义颜色）"""
+
+    def __init__(self, ai_game, x, y,
+                 size_mult=1.0,
+                 speed_mult=1.0,
+                 lifetime_mult=1.0,
+                 colors=None):
+        """
+        在指定的位置创建一个粒子。
+        参数：
+            size_mult: 尺寸缩放倍率（默认 1.0）
+            speed_mult: 速度缩放倍率（默认 1.0）
+            lifetime_mult: 生命周期倍率（默认 1.0）
+            colors: 自定义颜色列表，None 则使用 settings 默认
+        """
         super().__init__()
         self.screen = ai_game.screen
         self.settings = ai_game.settings
 
-        # 随机大小（半径）
-        self.size = random.randint(
-            self.settings.particle_min_size,
-            self.settings.particle_max_size
-        )
-        self.base_color = random.choice(self.settings.particle_colors)
+        # 颜色
+        palette = colors if colors else self.settings.particle_colors
+        self.base_color = random.choice(palette)
 
-        # 创建带透明通道的 Surface（直径 x 直径）
+        # 随机大小（应用倍率）
+        base_min = self.settings.particle_min_size
+        base_max = self.settings.particle_max_size
+        self.size = int(random.randint(base_min, base_max) * size_mult)
+        if self.size < 1:
+            self.size = 1
+
+        # 创建带透明通道的 Surface
         diameter = self.size * 2
         self.image = pygame.Surface((diameter, diameter), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(x, y))
@@ -27,14 +46,14 @@ class Particle(Sprite):
         self.x = float(self.rect.x)
         self.y = float(self.rect.y)
 
-        # 随机速度和方向
-        angle = random.uniform(0, 2 * 3.14159)
-        speed = random.uniform(1.5, 4.0)
+        # 随机速度和方向（应用倍率）
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(1.5, 4.0) * speed_mult
         self.velocity_x = speed * pygame.math.Vector2(1, 0).rotate_rad(angle).x
         self.velocity_y = speed * pygame.math.Vector2(1, 0).rotate_rad(angle).y
 
-        # 生命周期
-        self.lifetime = self.settings.particle_lifetime
+        # 生命周期（应用倍率）
+        self.lifetime = int(self.settings.particle_lifetime * lifetime_mult)
         self.max_lifetime = self.lifetime
 
         # 初始绘制
