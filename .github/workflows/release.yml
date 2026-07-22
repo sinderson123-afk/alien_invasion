@@ -26,8 +26,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install pygame pyinstaller pillow
           pip install -r requirements.txt
-          pip install pyinstaller pillow
+          pip list | Select-String pygame
 
       - name: Convert icon
         run: |
@@ -35,7 +36,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          python -m PyInstaller --onefile --windowed --name AlienInvasion --icon=icon.ico --add-data "resource;resource" --hidden-import pygame --clean --noconfirm alien_invasion.py
+          python -m PyInstaller --onefile --windowed --name AlienInvasion --icon=icon.ico --add-data "resource;resource" --collect-all pygame --hidden-import pygame --hidden-import pygame._sdl2 --hidden-import cv2 --clean --noconfirm alien_invasion.py
 
       - name: Delete old release asset
         uses: actions/github-script@v7
