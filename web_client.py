@@ -10,6 +10,8 @@ API:
 """
 
 import json
+import sys
+import os
 import time
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -17,7 +19,7 @@ from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin
 
 
-_CACHE_FILE = Path(__file__).parent / "upload_cache.json"
+_CACHE_FILE = Path(os.path.dirname(sys.argv[0])) / "upload_cache.json"
 _TIMEOUT = 8
 
 

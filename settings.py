@@ -1,4 +1,5 @@
 import sys
+import os
 from pathlib import Path
 
 
@@ -114,7 +115,7 @@ class Settings:
         # 计分设置
         self.alien_points = 50
         self.boss_points = 500              # Boss 击杀分数
-        self.high_score_file = "high_score.json"
+        self.high_score_file = str(Path(os.path.dirname(sys.argv[0])) / "high_score.json")
 
         # 导弹设置
         self.missile_score_step = 500   # 每得500分奖励一枚导弹
@@ -214,7 +215,8 @@ class Settings:
         self.fail_banner_duration = 90      # 失败横幅显示帧数
 
         # --- 存档设置 ---
-        self.save_file = "savegame.json"
+        # 存档放在 exe 同目录（PyInstaller onefile 下 cwd 可能不固定）
+        self.save_file = str(Path(os.path.dirname(sys.argv[0])) / "savegame.json")
 
         # --- 服务器设置 ---
         self.server_url = "https://alien-invasion-1018096304579.asia-east1.run.app"

@@ -1,13 +1,17 @@
 """玩家数据持久化：金币、道具、技能等级、认证信息"""
 
 import json
+import sys
+import os
 from pathlib import Path
 
 
 class PlayerData:
     """读写 player_data.json，管理跨会话持久化数据"""
 
-    def __init__(self, file_path="player_data.json"):
+    def __init__(self, file_path=None):
+        if file_path is None:
+            file_path = str(Path(os.path.dirname(sys.argv[0])) / "player_data.json")
         self.file_path = Path(file_path)
 
     def load(self):
