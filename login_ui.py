@@ -11,6 +11,16 @@
 import pygame
 
 
+def _get_font(size, bold=False):
+    """获取支持中文的字体，优先微软雅黑"""
+    for name in ('Microsoft YaHei', 'SimHei', 'SimSun', 'Arial'):
+        try:
+            return pygame.font.SysFont(name, size, bold=bold)
+        except Exception:
+            continue
+    return pygame.font.SysFont(None, size)
+
+
 # 状态常量
 (MODE_LOGIN, MODE_REGISTER_EMAIL, MODE_REGISTER_CODE,
  MODE_RESET_EMAIL, MODE_RESET_CODE) = range(5)
@@ -54,11 +64,11 @@ class LoginOverlay:
         # 各模式的输入文本
         self._fields = ['', '', '', '']  # 索引含义见各模式的 _field_labels
 
-        # 字体
-        self._font_large = pygame.font.SysFont(None, 42)
-        self._font = pygame.font.SysFont(None, 32)
-        self._font_small = pygame.font.SysFont(None, 24)
-        self._font_hint = pygame.font.SysFont(None, 20)
+        # 字体（兼容中文）
+        self._font_large = _get_font(42)
+        self._font = _get_font(32)
+        self._font_small = _get_font(24)
+        self._font_hint = _get_font(20)
 
         # 颜色
         self._bg = (25, 30, 50)
@@ -448,7 +458,7 @@ class LoginOverlay:
         labels = self._field_labels
         n_fields = len(labels)
 
-        panel_w, panel_h = 500, 200 + n_fields * 72
+        panel_w, panel_h = 500, n_fields * 72 + 280
         panel = pygame.Surface((panel_w, panel_h))
         panel.fill(self._bg)
         panel_rect = panel.get_rect(center=self.screen_rect.center)
