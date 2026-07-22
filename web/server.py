@@ -28,8 +28,7 @@ from google.cloud import firestore
 _BASE_DIR = Path(__file__).parent.resolve()
 os.chdir(_BASE_DIR)
 
-RESEND_API_KEY = os.environ.get(
-    'RESEND_API_KEY', 're_L5Jw76Mj_2uHhgxTjCa3zfwwSBkgjB4hn')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 RESEND_FROM = "Alien Invasion <onboarding@resend.dev>"
 CODE_EXPIRE_SECONDS = 600  # 10 分钟
 CODE_MAX_ATTEMPTS = 3
