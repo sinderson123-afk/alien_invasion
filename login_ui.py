@@ -458,7 +458,7 @@ class LoginOverlay:
         labels = self._field_labels
         n_fields = len(labels)
 
-        panel_w, panel_h = 500, n_fields * 72 + 300
+        panel_w, panel_h = 580, n_fields * 72 + 300
         panel = pygame.Surface((panel_w, panel_h))
         panel.fill(self._bg)
         panel_rect = panel.get_rect(center=self.screen_rect.center)
@@ -486,17 +486,21 @@ class LoginOverlay:
         else:
             field_start_y = py + 72
 
-        # 输入框
+        # 输入框（标签右对齐不遮挡，输入框紧跟）
+        label_right = px + 155
+        input_left = px + 170
+        input_width = 375
+
         for i, label in enumerate(labels):
             row_y = field_start_y + i * 72
-            self._draw_label(px, row_y, label)
+            self._draw_label_right(label_right, row_y, label)
 
             masked = self._field_masks[i]
             text = self._fields[i]
             display = '*' * len(text) if masked else text
 
             inp_rect = self._draw_input(
-                px + 140, row_y, display,
+                input_left, row_y, display, input_width,
                 active=(self._active_field == i))
             self._click_rects.append((inp_rect, None))
 
@@ -541,12 +545,13 @@ class LoginOverlay:
             self.screen.blit(forgot, forgot_rect)
         self._click_rects.append((forgot_rect, 'forgot'))
 
-    def _draw_label(self, px, y, text):
+    def _draw_label_right(self, right_x, y, text):
+        """在指定右边界位置绘制标签文字（右对齐）"""
         label = self._font.render(text, True, self._gray)
-        self.screen.blit(label, (px + 25, y + 5))
+        self.screen.blit(label, (right_x - label.get_width(), y + 5))
 
-    def _draw_input(self, x, y, text, active=False):
-        w, h = 310, 36
+    def _draw_input(self, x, y, text, w=310, active=False):
+        h = 36
         rect = pygame.Rect(x, y, w, h)
         bg = self._inp_active if active else self._inp_bg
         pygame.draw.rect(self.screen, bg, rect, border_radius=4)
