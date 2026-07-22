@@ -458,11 +458,7 @@ class LoginOverlay:
         labels = self._field_labels
         n_fields = len(labels)
 
-        has_email_hint = (self._mode in (MODE_REGISTER_CODE, MODE_RESET_CODE)
-                          and getattr(self, '_register_email', ''))
-        hint_extra = 24 if has_email_hint else 0
-        ROW_H = 70
-        panel_w, panel_h = 500, n_fields * ROW_H + hint_extra + 290
+        panel_w, panel_h = 500, n_fields * 72 + 300
         panel = pygame.Surface((panel_w, panel_h))
         panel.fill(self._bg)
         panel_rect = panel.get_rect(center=self.screen_rect.center)
@@ -479,35 +475,33 @@ class LoginOverlay:
             MODE_RESET_CODE: 'RESET PASSWORD',
         }
         title = self._font_large.render(title_map[self._mode], True, self._gold)
-        self.screen.blit(title, (cx - title.get_width() // 2, py + 15))
+        self.screen.blit(title, (cx - title.get_width() // 2, py + 20))
 
-        field_start_y = py + 68
-
-        # 邮箱提示
-        if has_email_hint:
+        # 邮箱提示（注册/重置模式下显示）
+        if self._mode in (MODE_REGISTER_CODE, MODE_RESET_CODE) and hasattr(self, '_register_email'):
             email_hint = self._font_small.render(
                 self._register_email, True, self._gray)
-            self.screen.blit(email_hint,
-                             (cx - email_hint.get_width() // 2, field_start_y))
-            field_start_y += hint_extra
+            self.screen.blit(email_hint, (cx - email_hint.get_width() // 2, py + 60))
+            field_start_y = py + 90
+        else:
+            field_start_y = py + 72
 
-        # 输入框（标签在上，输入框在下，避免侧边重叠）
+        # 输入框
         for i, label in enumerate(labels):
-            row_y = field_start_y + i * ROW_H
-            # 标签
-            lbl = self._font_small.render(label, True, self._gray)
-            self.screen.blit(lbl, (px + 40, row_y))
-            # 输入框
+            row_y = field_start_y + i * 72
+            self._draw_label(px, row_y, label)
+
             masked = self._field_masks[i]
             text = self._fields[i]
             display = '*' * len(text) if masked else text
+
             inp_rect = self._draw_input(
-                px + 40, row_y + 26, display,
+                px + 140, row_y, display,
                 active=(self._active_field == i))
             self._click_rects.append((inp_rect, None))
 
-        # 状态 / 倒计时
-        status_y = field_start_y + n_fields * ROW_H + 6
+        # 倒计时 / 状态
+        status_y = field_start_y + n_fields * 72 + 5
         if self._countdown > 0:
             cd = self._font_small.render(
                 f'Resend in {self._countdown}s', True, self._gray)
@@ -517,7 +511,7 @@ class LoginOverlay:
             self.screen.blit(st, (cx - st.get_width() // 2, status_y))
 
         # 主按钮
-        btn_y = status_y + 26
+        btn_y = status_y + 20
         btn_texts = {
             MODE_LOGIN: 'Log In', MODE_REGISTER_EMAIL: 'Send Code',
             MODE_REGISTER_CODE: 'Register', MODE_RESET_EMAIL: 'Send Code',
@@ -526,8 +520,8 @@ class LoginOverlay:
         main_rect = self._draw_button(cx, btn_y, btn_texts[self._mode], self._green)
         self._click_rects.append((main_rect, 'submit'))
 
-        # 辅助按钮
-        aux_y = btn_y + 38
+        # 辅助按钮（使用实际按钮高度计算间距）
+        aux_y = main_rect.bottom + 10
         aux_texts = {
             MODE_LOGIN: 'Register',
             MODE_REGISTER_EMAIL: 'Back to Login',
@@ -543,7 +537,7 @@ class LoginOverlay:
         forgot_rect = pygame.Rect(0, 0, 1, 1)
         if self._mode == MODE_LOGIN:
             forgot = self._font_hint.render('Forgot Password?', True, self._blue)
-            forgot_rect = forgot.get_rect(centerx=cx, top=aux_y + 28)
+            forgot_rect = forgot.get_rect(centerx=cx, top=aux_rect.bottom + 12)
             self.screen.blit(forgot, forgot_rect)
         self._click_rects.append((forgot_rect, 'forgot'))
 
