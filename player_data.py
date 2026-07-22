@@ -1,4 +1,4 @@
-"""玩家数据持久化：金币、道具、技能等级、认证信息（加密存储）"""
+"""Player data persistence: coins, items, skills, auth info (encrypted)"""
 
 import sys
 import os
@@ -8,8 +8,9 @@ from file_crypto import encrypt_json, decrypt_json
 
 _DEFAULTS = {
     'coins': 0,
-    'items': {'magnet': 0, 'shield': 0},
+    'items': {'magnet': 0, 'shield': 0, 'clover': 0},
     'skills': {'speed': 0, 'ammo': 0, 'vitality': 0},
+    'armor': None,
     'token': '',
     'username': '',
     'email': '',
@@ -17,7 +18,7 @@ _DEFAULTS = {
 
 
 class PlayerData:
-    """读写 player_data.json，管理跨会话持久化数据"""
+    """Read/write player_data.dat, manage cross-session persistent data"""
 
     def __init__(self, file_path=None):
         if file_path is None:
@@ -32,15 +33,16 @@ class PlayerData:
             return dict(_DEFAULTS)
         return {
             'coins': data.get('coins', 0),
-            'items': data.get('items', {'magnet': 0, 'shield': 0}),
+            'items': data.get('items', {'magnet': 0, 'shield': 0, 'clover': 0}),
             'skills': data.get('skills', {'speed': 0, 'ammo': 0, 'vitality': 0}),
+            'armor': data.get('armor', None),
             'token': data.get('token', ''),
             'username': data.get('username', ''),
             'email': data.get('email', ''),
         }
 
-    def save(self, coins, items, skills, token='', username='', email=''):
-        data = {'coins': coins, 'items': items, 'skills': skills}
+    def save(self, coins, items, skills, armor=None, token='', username='', email=''):
+        data = {'coins': coins, 'items': items, 'skills': skills, 'armor': armor}
         existing = self.load()
         if token:
             data['token'] = token

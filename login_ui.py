@@ -1,18 +1,18 @@
-"""登录/注册 UI — 邮箱验证码 + 多步状态机
+"""Login/Registration UI - email verification code + multi-step state machine
 
-状态流转:
-  MODE_LOGIN       → 用户名/邮箱 + 密码 → 登录
-   ├─"Register"    → MODE_REGISTER_EMAIL → 邮箱 → 发送验证码
-   │                 └─→ MODE_REGISTER_CODE  → 验证码 + 用户名 + 密码 → 注册
-   └─"Forgot?"     → MODE_RESET_EMAIL    → 邮箱 → 发送验证码
-                     └─→ MODE_RESET_CODE      → 验证码 + 新密码 → 重置
+State flow:
+  MODE_LOGIN       -> username/email + password -> login
+   ├─"Register"    -> MODE_REGISTER_EMAIL -> email -> send code
+   │                 └-> MODE_REGISTER_CODE  -> code + username + password -> register
+   └─"Forgot?"     -> MODE_RESET_EMAIL    -> email -> send code
+                     └-> MODE_RESET_CODE      -> code + new password -> reset
 """
 
 import pygame
 
 
 def _get_font(size, bold=False):
-    """获取支持中文的字体，优先微软雅黑"""
+    """Get CJK-capable font, prefer Microsoft YaHei"""
     for name in ('Microsoft YaHei', 'SimHei', 'SimSun', 'Arial'):
         try:
             return pygame.font.SysFont(name, size, bold=bold)
@@ -21,13 +21,13 @@ def _get_font(size, bold=False):
     return pygame.font.SysFont(None, size)
 
 
-# 状态常量
+# State constants
 (MODE_LOGIN, MODE_REGISTER_EMAIL, MODE_REGISTER_CODE,
  MODE_RESET_EMAIL, MODE_RESET_CODE) = range(5)
 
 
 class LoginOverlay:
-    """登录/注册覆盖层"""
+    """Login/Registration overlay"""
 
     def __init__(self, screen, web_client, player_data):
         self.screen = screen
@@ -39,10 +39,10 @@ class LoginOverlay:
         self.username = ''
         self.email = ''
 
-        # 启用文本输入（中文输入法、@ 符号等）
+        # Enable text input (IME, @ symbol, etc.)
         pygame.key.start_text_input()
 
-        # 自动登录（已有 token）
+        # Auto login (if token exists)
         saved_token = self.player_data.get_token()
         saved_username = self.player_data.get_username()
         if saved_token and saved_username:
@@ -52,25 +52,25 @@ class LoginOverlay:
             self.done = True
             return
 
-        # 状态机
+        # State machine
         self._mode = MODE_LOGIN
         self._active_field = 0
         self._status = ''
         self._status_color = (180, 180, 180)
         self._cursor_timer = 0
-        self._countdown = 0  # 发送验证码后倒计时
+        self._countdown = 0  # Countdown after sending code
         self._countdown_max = 60
 
-        # 各模式的输入文本
-        self._fields = ['', '', '', '']  # 索引含义见各模式的 _field_labels
+        # Input text per mode
+        self._fields = ['', '', '', '']  # Index meanings per mode _field_labels
 
-        # 字体（兼容中文）
+        # Font (CJK compatible)
         self._font_large = _get_font(42)
         self._font = _get_font(32)
         self._font_small = _get_font(24)
         self._font_hint = _get_font(20)
 
-        # 颜色
+        # Colors
         self._bg = (25, 30, 50)
         self._inp_bg = (40, 45, 70)
         self._inp_active = (50, 55, 90)
@@ -81,11 +81,11 @@ class LoginOverlay:
         self._blue = (80, 150, 240)
         self._gold = (255, 215, 0)
 
-        # 点击区域（动态计算）
+        # Click areas (dynamically calculated)
         self._click_rects = []
 
     # ------------------------------------------------------------------
-    # 当前模式的字段配置
+    # Field config for current mode
     # ------------------------------------------------------------------
     @property
     def _field_labels(self):
@@ -103,7 +103,7 @@ class LoginOverlay:
 
     @property
     def _field_masks(self):
-        """哪些字段是密码（显示 *）"""
+        """Which fields are passwords (show *)"""
         if self._mode == MODE_LOGIN:
             return [False, True]
         elif self._mode == MODE_REGISTER_CODE:
@@ -122,7 +122,7 @@ class LoginOverlay:
         return result
 
     # ------------------------------------------------------------------
-    # 事件处理
+    # Event handling
     # ------------------------------------------------------------------
     def handle_event(self, event):
         if self.done:
@@ -133,7 +133,7 @@ class LoginOverlay:
             return self._handle_click(event.pos)
         return False
 
-    # US 键盘 Shift 映射表（处理 stop_text_input 导致 unicode 不正确的问题）
+    # US keyboard Shift map (fixes unicode issue from stop_text_input)
     _US_SHIFT_MAP = {
         '`': '~', '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
         '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
@@ -145,7 +145,7 @@ class LoginOverlay:
         labels = self._field_labels
         n_fields = len(labels)
 
-        # Ctrl+V 粘贴
+        # Ctrl+V paste
         ctrl = event.mod & pygame.KMOD_CTRL
         if ctrl and event.key == pygame.K_v:
             if self._active_field < n_fields:
@@ -199,11 +199,11 @@ class LoginOverlay:
         ch = event.unicode
         shift = event.mod & pygame.KMOD_SHIFT
 
-        # Shift 修正：stop_text_input 会导致 unicode 不反映 Shift 状态
+        # Shift fix: stop_text_input causes unicode to not reflect Shift state
         if shift and len(ch) == 1 and ch in self._US_SHIFT_MAP:
             ch = self._US_SHIFT_MAP[ch]
 
-        # 字符过滤
+        # Character filter
         if is_email:
             pass
         elif is_code:
@@ -224,28 +224,28 @@ class LoginOverlay:
 
         rects = self._click_rects
 
-        # 检查输入框
+        # Check input fields
         for i in range(len(rects) - 3):
             if rects[i][0].collidepoint(pos):
                 self._active_field = i
                 self._cursor_timer = 0
                 return True
 
-        # 检查主按钮
+        # Check primary button
         if len(rects) >= 3:
             main_btn = rects[-3][0]
             if main_btn.collidepoint(pos):
                 self._submit()
                 return True
 
-        # 检查辅助按钮
+        # Check secondary button
         if len(rects) >= 2:
             aux_btn = rects[-2][0]
             if aux_btn.collidepoint(pos):
                 self._aux_action()
                 return True
 
-        # 检查忘记密码 / 第三按钮
+        # Check forgot password / tertiary button
         if len(rects) >= 1:
             third_btn = rects[-1][0]
             if third_btn.collidepoint(pos):
@@ -255,7 +255,7 @@ class LoginOverlay:
         return False
 
     def _forgot_action(self):
-        """忘记密码 → 重置模式"""
+        """Forgot password -> reset mode"""
         if self._mode == MODE_LOGIN:
             self._mode = MODE_RESET_EMAIL
             self._active_field = 0
@@ -264,39 +264,39 @@ class LoginOverlay:
             self._countdown = 0
 
     # ------------------------------------------------------------------
-    # 提交
+    # Submit
     # ------------------------------------------------------------------
     def _submit(self):
         if self._mode == MODE_LOGIN:
             id_ = self._fields[0].strip()
             pw = self._fields[1]
             if not id_ or not pw:
-                self._set_status('请输入用户名/邮箱和密码', self._red)
+                self._set_status('Please enter username/email and password', self._red)
                 return
             try:
                 result = self.client.login(id_, pw)
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
 
         elif self._mode == MODE_REGISTER_EMAIL:
             email = self._fields[0].strip()
             if not email or '@' not in email:
-                self._set_status('请输入有效的邮箱', self._red)
+                self._set_status('Please enter a valid email', self._red)
                 return
             if self._countdown > 0:
-                self._set_status(f'请等待 {self._countdown}s', self._gray)
+                self._set_status(f'Please wait {self._countdown}s', self._gray)
                 return
             try:
                 result = self.client.send_code(email, 'register')
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
 
             if 'success' in result:
                 self._register_email = email
                 self._mode = MODE_REGISTER_CODE
                 self._active_field = 0
                 self._fields = ['', '', '', '']
-                self._status = '验证码已发送'
+                self._status = 'Verification code sent'
                 self._status_color = self._green
                 self._countdown = self._countdown_max
             return
@@ -307,42 +307,42 @@ class LoginOverlay:
             username = self._fields[1].strip() if len(self._fields) > 1 else ''
             pw = self._fields[2] if len(self._fields) > 2 else ''
             if not code or len(code) != 6:
-                self._set_status('请输入 6 位验证码', self._red)
+                self._set_status('Please enter 6-digit code', self._red)
                 return
             if not username:
-                self._set_status('请设置用户名', self._red)
+                self._set_status('Please set a username', self._red)
                 return
             if len(username) < 2:
-                self._set_status('用户名至少 2 位', self._red)
+                self._set_status('Username must be at least 2 characters', self._red)
                 return
             if not pw or len(pw) < 4:
-                self._set_status('密码至少 4 位', self._red)
+                self._set_status('Password must be at least 4 characters', self._red)
                 return
             try:
                 result = self.client.register(
                     self._register_email, code, username, pw)
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
 
         elif self._mode == MODE_RESET_EMAIL:
             email = self._fields[0].strip()
             if not email or '@' not in email:
-                self._set_status('请输入已注册的邮箱', self._red)
+                self._set_status('Please enter a registered email', self._red)
                 return
             if self._countdown > 0:
-                self._set_status(f'请等待 {self._countdown}s', self._gray)
+                self._set_status(f'Please wait {self._countdown}s', self._gray)
                 return
             try:
                 result = self.client.send_code(email, 'reset')
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
 
             if 'success' in result:
                 self._register_email = email
                 self._mode = MODE_RESET_CODE
                 self._active_field = 0
                 self._fields = ['', '', '', '']
-                self._status = '验证码已发送'
+                self._status = 'Verification code sent'
                 self._status_color = self._green
                 self._countdown = self._countdown_max
             return
@@ -351,19 +351,19 @@ class LoginOverlay:
             code = self._fields[0].strip()
             new_pw = self._fields[1] if len(self._fields) > 1 else ''
             if not code or len(code) != 6:
-                self._set_status('请输入 6 位验证码', self._red)
+                self._set_status('Please enter 6-digit code', self._red)
                 return
             if not new_pw or len(new_pw) < 4:
-                self._set_status('新密码至少 4 位', self._red)
+                self._set_status('New password must be at least 4 characters', self._red)
                 return
             try:
                 result = self.client.reset_password(
                     self._register_email, code, new_pw)
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
 
             if result.get('success'):
-                self._set_status('密码已重置，请返回登录', self._green)
+                self._set_status('Password reset, please return to login', self._green)
                 self._mode = MODE_LOGIN
                 self._active_field = 0
                 self._fields = ['', '', '', '']
@@ -379,12 +379,12 @@ class LoginOverlay:
             self.player_data.save_auth(self.token, self.username)
             if self.email:
                 self.player_data.save_email(self.email)
-            self._status = '登录成功！'
+            self._status = 'Login successful!'
             self._status_color = self._green
             self.done = True
 
     def _aux_action(self):
-        """辅助按钮：切换注册/登录/忘记密码"""
+        """Secondary button: switch register/login/forgot"""
         if self._mode == MODE_LOGIN:
             self._mode = MODE_REGISTER_EMAIL
             self._active_field = 0
@@ -393,50 +393,50 @@ class LoginOverlay:
             self._register_email = ''
             self._countdown = 0
         elif self._mode == MODE_REGISTER_EMAIL:
-            # "返回登录"
+            # "Back to login"
             self._mode = MODE_LOGIN
             self._fields = ['', '', '', '']
             self._status = ''
             self._countdown = 0
         elif self._mode == MODE_REGISTER_CODE:
-            # "重新发送验证码"
+            # "Resend verification code"
             if self._countdown > 0:
                 return
             try:
                 result = self.client.send_code(self._register_email, 'register')
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
             if 'success' in result:
                 self._countdown = self._countdown_max
-                self._set_status('验证码已重发', self._green)
+                self._set_status('Code resent', self._green)
             else:
-                self._set_status(result.get('error', '发送失败'), self._red)
+                self._set_status(result.get('error', 'Send failed'), self._red)
         elif self._mode == MODE_RESET_EMAIL:
-            # "返回登录"
+            # "Back to login"
             self._mode = MODE_LOGIN
             self._fields = ['', '', '', '']
             self._status = ''
             self._countdown = 0
         elif self._mode == MODE_RESET_CODE:
-            # "重新发送验证码"
+            # "Resend verification code"
             if self._countdown > 0:
                 return
             try:
                 result = self.client.send_code(self._register_email, 'reset')
             except Exception:
-                result = {'error': '无法连接服务器'}
+                result = {'error': 'Could not connect to server'}
             if 'success' in result:
                 self._countdown = self._countdown_max
-                self._set_status('验证码已重发', self._green)
+                self._set_status('Code resent', self._green)
             else:
-                self._set_status(result.get('error', '发送失败'), self._red)
+                self._set_status(result.get('error', 'Send failed'), self._red)
 
     def _set_status(self, msg, color):
         self._status = msg
         self._status_color = color
 
     # ------------------------------------------------------------------
-    # 更新
+    # Update
     # ------------------------------------------------------------------
     def update(self):
         if self.done:
@@ -446,13 +446,13 @@ class LoginOverlay:
             self._countdown -= 1
 
     # ------------------------------------------------------------------
-    # 绘制
+    # Draw
     # ------------------------------------------------------------------
     def draw(self):
         if self.done:
             return
 
-        # 半透明遮罩
+        # Semi-transparent overlay
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 210))
         self.screen.blit(overlay, (0, 0))
@@ -470,7 +470,7 @@ class LoginOverlay:
 
         self._click_rects = []
 
-        # 标题
+        # Title
         title_map = {
             MODE_LOGIN: 'LOGIN', MODE_REGISTER_EMAIL: 'REGISTER',
             MODE_REGISTER_CODE: 'REGISTER', MODE_RESET_EMAIL: 'RESET PASSWORD',
@@ -479,7 +479,7 @@ class LoginOverlay:
         title = self._font_large.render(title_map[self._mode], True, self._gold)
         self.screen.blit(title, (cx - title.get_width() // 2, py + 20))
 
-        # 邮箱提示（注册/重置模式下显示）
+        # Email hint (shown in register/reset mode)
         if self._mode in (MODE_REGISTER_CODE, MODE_RESET_CODE) and hasattr(self, '_register_email'):
             email_hint = self._font_small.render(
                 self._register_email, True, self._gray)
@@ -488,7 +488,7 @@ class LoginOverlay:
         else:
             field_start_y = py + 72
 
-        # 输入框（标签右对齐不遮挡，输入框紧跟）
+        # Input fields (labels right-aligned, input fields next)
         label_right = px + 155
         input_left = px + 170
         input_width = 375
@@ -506,7 +506,7 @@ class LoginOverlay:
                 active=(self._active_field == i))
             self._click_rects.append((inp_rect, None))
 
-        # 倒计时 / 状态
+        # Countdown / Status
         status_y = field_start_y + n_fields * 72 + 5
         if self._countdown > 0:
             cd = self._font_small.render(
@@ -516,7 +516,7 @@ class LoginOverlay:
             st = self._font_small.render(self._status, True, self._status_color)
             self.screen.blit(st, (cx - st.get_width() // 2, status_y))
 
-        # 主按钮
+        # Primary button
         btn_y = status_y + 20
         btn_texts = {
             MODE_LOGIN: 'Log In', MODE_REGISTER_EMAIL: 'Send Code',
@@ -526,7 +526,7 @@ class LoginOverlay:
         main_rect = self._draw_button(cx, btn_y, btn_texts[self._mode], self._green)
         self._click_rects.append((main_rect, 'submit'))
 
-        # 辅助按钮（使用实际按钮高度计算间距）
+        # Secondary button (spacing by actual button height)
         aux_y = main_rect.bottom + 10
         aux_texts = {
             MODE_LOGIN: 'Register',
@@ -539,7 +539,7 @@ class LoginOverlay:
                                      self._blue, small=True)
         self._click_rects.append((aux_rect, 'aux'))
 
-        # 忘记密码链接（仅登录模式）
+        # Forgot password link (login mode only)
         forgot_rect = pygame.Rect(0, 0, 1, 1)
         if self._mode == MODE_LOGIN:
             forgot = self._font_hint.render('Forgot Password?', True, self._blue)
@@ -548,7 +548,7 @@ class LoginOverlay:
         self._click_rects.append((forgot_rect, 'forgot'))
 
     def _draw_label_right(self, right_x, y, text):
-        """在指定右边界位置绘制标签文字（右对齐）"""
+        """Draw label at specified right-edge position (right-aligned)"""
         label = self._font.render(text, True, self._gray)
         self.screen.blit(label, (right_x - label.get_width(), y + 5))
 

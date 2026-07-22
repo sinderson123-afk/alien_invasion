@@ -1,10 +1,10 @@
-"""JSON 文件加密/解密 — 防篡改、原子写、自动备份、多密钥管理（stdlib only）
+"""JSON file encryption/decryption - tamper-proof, atomic write, auto backup, multi-key (stdlib only)
 
-文件格式:
+File format:
   [4B CRC32] [4B format_version] [encrypted data]
 
-写入: .tmp → 校验 → rename → 旧文件自动 .bak
-读取: 主文件 → .bak 回退
+Write: .tmp -> verify -> rename -> old auto .bak
+Read: main -> .bak fallback
 """
 
 import json
@@ -13,11 +13,11 @@ import hashlib
 import zlib
 from pathlib import Path
 
-# 当前加密格式版本
+# Current encryption format version
 _FORMAT_VERSION = 1
 
-# 密钥池：旧密钥保留用于解密，当前密钥用于加密
-# 格式: {version: key_bytes}
+# Key pool: old keys retained for decryption, current key for encryption
+# Format: {version: key_bytes}
 _KEYS = {
     1: b"AlienInvasion2026\x14\xa3\xf2\xc7\x1b_\xdd\xe8\x99\x04\x52",
 }
@@ -49,7 +49,7 @@ def _decrypt(data: bytes) -> bytes | None:
     raw = bytes(b ^ key[i % 32] for i, b in enumerate(encrypted))
 
     if zlib.crc32(raw) != crc_stored:
-        # 尝试用当前密钥解密（旧格式没有 fmt_version 头的情况）
+        # Try decrypting with current key (for old format without fmt_version header)
         if fmt_version != _FORMAT_VERSION:
             raw2 = bytes(b ^ _derive_key(_FORMAT_VERSION)[i % 32]
                          for i, b in enumerate(encrypted))
@@ -60,7 +60,7 @@ def _decrypt(data: bytes) -> bytes | None:
 
 
 def encrypt_json(data: dict, filepath: Path) -> bool:
-    """加密 JSON 数据，原子写入（.tmp → rename），旧文件自动 .bak 备份"""
+    """Encrypt JSON data, atomic write (.tmp -> rename), old file auto .bak backup"""
     try:
         raw = json.dumps(data, ensure_ascii=False).encode('utf-8')
         blob = _encrypt(raw)
@@ -88,7 +88,7 @@ def encrypt_json(data: dict, filepath: Path) -> bool:
 
 
 def decrypt_json(filepath: Path) -> dict | None:
-    """解密 JSON 文件。主文件失败自动回退 .bak，都失败返回 None"""
+    """Decrypt JSON file. Fallback to .bak if main fails, return None if both fail"""
     for path in (filepath, filepath.with_suffix(filepath.suffix + '.bak')):
         if not path.exists():
             continue

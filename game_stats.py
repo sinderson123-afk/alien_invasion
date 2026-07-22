@@ -6,61 +6,67 @@ from file_crypto import encrypt_json, decrypt_json
 
 
 class GameState(Enum):
-    """游戏主状态机，替代原有的 game_active 布尔值和 shop_open 标志"""
-    LOGIN = auto()         # 登录/注册画面
-    MENU = auto()          # 开始画面
-    PLAYING = auto()       # 游戏中
-    PAUSED = auto()        # 暂停
-    SHOP = auto()          # 商店界面
-    TUTORIAL = auto()      # 教程画面
-    LEADERBOARD = auto()   # 排行榜
+    """Game state machine, replacing old game_active bool and shop_open flag"""
+    LOGIN = auto()         # Login/Registration screen
+    MENU = auto()          # Start screen
+    PLAYING = auto()       # Playing
+    PAUSED = auto()        # Paused
+    SHOP = auto()          # Shop screen
+    TUTORIAL = auto()      # Tutorial screen
+    LEADERBOARD = auto()   # Leaderboard
 
 
 class GameStats:
-    """跟踪游戏的统计信息"""
+    """Track game statistics"""
 
     def __init__(self,ai_game):
-        """初始化统计信息"""
+        """Initialize statistics"""
         self.settings = ai_game.settings
 
-        # 加载持久化数据（金币、道具、技能）
+        # Load persistent data (coins, items, skills, armor)
         self.player_data = PlayerData()
         saved = self.player_data.load()
         self.coins = saved['coins']
         self.items = saved['items']
         self.skills = saved['skills']
+        self.armor_tier = saved['armor']
 
         self.reset_stats()
 
-        # 从文件中读取历史最高分
+        # Load high score from file
         self.high_score = self._load_high_score()
 
     def reset_stats(self):
-        """初始化游戏在运行期间可能变化的统计信息"""
-        self.ship_left = self.settings.ship_limit + self.skills['vitality']
+        """Initialize stats that change during gameplay"""
+        self.max_hp = self._calc_max_hp()
+        self.ship_hp = self.max_hp
         self.score = 0
-        self.kills = 0                     # 累计击杀数（用于计算关卡）
-        # 导弹库存，以及已按分数发放的导弹总数（用于判断是否跨过新的奖励门槛）
+        self.kills = 0                     # Cumulative kills (for level calculation)
+        # Missile stock and total awarded by score (to check new thresholds)
         self.missiles = 0
         self.missiles_awarded = 0
-        # coins/items/skills 是持久化数据，不在每局重置
+        # coins/items/skills/armor are persistent, not reset per session
+
+    def _calc_max_hp(self):
+        """Calculate max HP: base HP * multiplier + vitality skill bonus"""
+        return (self.settings.ship_limit + self.skills['vitality']) * self.settings.ship_hp_multiplier
 
     def save_player_data(self):
-        """保存持久化数据"""
-        self.player_data.save(self.coins, self.items, self.skills)
+        """Save persistent data"""
+        self.player_data.save(self.coins, self.items, self.skills, armor=self.armor_tier)
 
     @property
     def level(self):
-        """根据累计击杀数自动计算当前关卡"""
+        """Calculate current level from cumulative kills"""
         return self.kills // self.settings.kills_per_level + 1
 
     def _load_high_score(self):
-        """从文件中读取最高分，文件不存在或损坏时返回0"""
+        """Load high score from file, return 0 if missing or corrupt"""
         data = decrypt_json(Path(self.settings.high_score_file))
         if data is None:
             return 0
         return data.get('high_score', 0)
 
     def save_high_score(self):
-        """将最高分写入加密文件"""
+        """Write high score to encrypted file"""
         encrypt_json({'high_score': self.high_score}, Path(self.settings.high_score_file))

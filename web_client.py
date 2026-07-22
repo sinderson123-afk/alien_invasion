@@ -1,12 +1,13 @@
-"""桌面游戏 HTTP 客户端 — 零外部依赖（只用 stdlib）
+"""Desktop game HTTP client - zero external deps (stdlib only)
 
 API:
-  - send_code(email, purpose)    发送邮箱验证码
-  - register(email, code, username, password)  注册
-  - login(identifier, password)              登录（用户名或邮箱）
-  - reset_password(email, code, new_password)  重置密码
-  - upload_stats(token, ...)     上传战绩
-  - get_leaderboard()            获取排行榜
+  - send_code(email, purpose)    Send email verification code
+  - register(email, code, username, password)  Register
+  - login(identifier, password)              Login (username or email)
+  - reset_password(email, code, new_password)  Reset password
+  - upload_stats(token, ...)     Upload stats
+  - get_leaderboard()            Get leaderboard
+  - check_update(current_version) Check GitHub for newer release
 """
 
 import json
@@ -25,16 +26,29 @@ _saves.mkdir(exist_ok=True)
 _CACHE_FILE = _saves / "upload_cache.dat"
 _TIMEOUT = 8
 
+_REPO_OWNER = "sinderson123-afk"
+_REPO_NAME = "alien_invasion"
+
+
+def _compare_versions(current: str, latest: str) -> bool:
+    """Return True if latest is strictly newer than current (both like 'v1.2.3' or '1.2.3')."""
+    def parse(v):
+        return tuple(int(p) for p in v.lstrip('v').split('.'))
+    try:
+        return parse(latest) > parse(current)
+    except (ValueError, IndexError):
+        return latest != current
+
 
 class WebClient:
-    """游戏 API 客户端"""
+    """Game API client"""
 
     def __init__(self, server_url: str):
         self.server_url = server_url.rstrip('/')
         self._pending_uploads = self._load_cache()
 
     # ------------------------------------------------------------------
-    # 本地缓存
+    # Local cache
     # ------------------------------------------------------------------
     def _load_cache(self) -> list:
         data = decrypt_json(_CACHE_FILE)
@@ -44,7 +58,7 @@ class WebClient:
         encrypt_json({'uploads': self._pending_uploads}, _CACHE_FILE)
 
     # ------------------------------------------------------------------
-    # HTTP 封装
+    # HTTP wrapper
     # ------------------------------------------------------------------
     def _post(self, endpoint: str, data: dict, token: str | None = None):
         url = urljoin(self.server_url, endpoint)
@@ -62,21 +76,21 @@ class WebClient:
             return json.loads(resp.read().decode())
 
     # ------------------------------------------------------------------
-    # 认证：发送验证码
+    # Auth: send verification code
     # ------------------------------------------------------------------
     def send_code(self, email: str, purpose: str = 'register') -> dict:
-        """发送邮箱验证码，返回 {success, message} 或 {error}"""
+        """Send email verification code, returns {success, message} or {error}"""
         return self._post('/api/auth/send-code', {
             'email': email.strip().lower(),
             'purpose': purpose,
         })
 
     # ------------------------------------------------------------------
-    # 认证：注册
+    # Auth: register
     # ------------------------------------------------------------------
     def register(self, email: str, code: str, username: str,
                  password: str) -> dict:
-        """注册新账号，返回 {token, username, email} 或 {error}"""
+        """Register new account, returns {token, username, email} or {error}"""
         return self._post('/api/auth/register', {
             'email': email.strip().lower(),
             'code': code.strip(),
@@ -85,21 +99,21 @@ class WebClient:
         })
 
     # ------------------------------------------------------------------
-    # 认证：登录
+    # Auth: login
     # ------------------------------------------------------------------
     def login(self, identifier: str, password: str) -> dict:
-        """登录（用户名或邮箱），返回 {token, username, email} 或 {error}"""
+        """Login (username or email), returns {token, username, email} or {error}"""
         return self._post('/api/auth/login', {
             'identifier': identifier.strip(),
             'password': password,
         })
 
     # ------------------------------------------------------------------
-    # 认证：重置密码
+    # Auth: reset password
     # ------------------------------------------------------------------
     def reset_password(self, email: str, code: str,
                        new_password: str) -> dict:
-        """重置密码，返回 {success, message} 或 {error}"""
+        """Reset password, returns {success, message} or {error}"""
         return self._post('/api/auth/reset-password', {
             'email': email.strip().lower(),
             'code': code.strip(),
@@ -107,7 +121,7 @@ class WebClient:
         })
 
     # ------------------------------------------------------------------
-    # 战绩
+    # Stats
     # ------------------------------------------------------------------
     def upload_stats(self, token: str, score: int, level: int,
                      kills: int = 0, coins: int = 0) -> dict:
@@ -120,7 +134,7 @@ class WebClient:
                 'time': int(time.time()),
             })
             self._save_cache()
-            return {'status': 'error', 'message': '上传失败，已缓存到本地'}
+            return {'status': 'error', 'message': 'Upload failed, cached locally'}
         self._retry_cache(token)
         return result
 
@@ -140,7 +154,31 @@ class WebClient:
         self._save_cache()
 
     # ------------------------------------------------------------------
-    # 排行榜
+    # Leaderboard
     # ------------------------------------------------------------------
     def get_leaderboard(self, limit: int = 20) -> dict:
         return self._get(f'/api/leaderboard?limit={limit}')
+
+    # ------------------------------------------------------------------
+    # Update check
+    # ------------------------------------------------------------------
+    def check_update(self, current_version: str):
+        """Check GitHub for a newer release. Returns (new_version, html_url) or (None, None)."""
+        url = (f"https://api.github.com/repos/{_REPO_OWNER}/{_REPO_NAME}"
+               "/releases/latest")
+        try:
+            req = Request(url, headers={'Accept': 'application/json'})
+            with urlopen(req, timeout=_TIMEOUT) as resp:
+                data = json.loads(resp.read().decode())
+            tag = data.get('tag_name', '')
+            if tag and _compare_versions(current_version, tag):
+                return tag, data.get('html_url', '')
+        except (URLError, HTTPError, OSError, json.JSONDecodeError, ValueError):
+            pass
+        return None, None
+
+    @staticmethod
+    def open_release_page(url: str):
+        """Open the release page in the default browser."""
+        import webbrowser
+        webbrowser.open(url)

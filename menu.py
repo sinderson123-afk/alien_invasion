@@ -137,26 +137,26 @@ class MenuSystem:
         self.btn_exit._prep_msg("Quit Game")
 
     def _create_tutorial_buttons(self):
-        """Create tutorial screen back button and instructions"""
-        self.btn_tutorial_back = Button(
-            self.ai_game, "Back",
-            width=200, height=55,
-            button_color=(60, 110, 170),
-            hover_color=(80, 140, 210),
-            font_size=34, border_radius=8)
-        self.btn_tutorial_back.rect.centerx = self.screen_rect.centerx
-        self.btn_tutorial_back.rect.bottom = self.screen_rect.bottom - 80
-        self.btn_tutorial_back._prep_msg("Back")
-
+        """Create tutorial screen instructions"""
         # Control instructions
-        self.tutorial_instructions = [
+        self.tutorial_controls = [
             ("Arrow Keys",  "Move ship left / right"),
             ("Space",       "Fire bullets"),
             ("E",           "Launch homing missile"),
             ("M",           "Open / Close shop"),
-            ("N",           "Activate magnet item"),
+            ("N",           "Activate magnet (auto-pickup coins)"),
+            ("C",           "Activate clover (push enemies upward)"),
             ("F5",          "Quick save game"),
             ("ESC",         "Pause / Save Game"),
+        ]
+
+        # System explanations
+        self.tutorial_tips = [
+            "Armor tiers (Shop): Silver -> Gold -> Mithril -> Galvorn -> Tilkal",
+            "Higher tier = more damage reduction. Trade-in old armor for 50% off.",
+            "HP bar replaces hearts. Vitality skill adds +1 HP slot (x10).",
+            "Clover (C key): panic button - blows aliens & meteors to the top.",
+            "Shield items block one full hit — buy them in the Shop!",
         ]
 
     # ------------------------------------------------------------------
@@ -280,8 +280,8 @@ class MenuSystem:
     # ------------------------------------------------------------------
 
     def draw_tutorial(self, mouse_pos=None):
-        """Draw tutorial screen: controls panel + back button"""
-        panel_w, panel_h = 560, 460
+        """Draw tutorial screen: controls panel + tips + back button"""
+        panel_w, panel_h = 620, 640
         panel = pygame.Surface((panel_w, panel_h))
         panel.fill((35, 35, 55))
         panel_rect = panel.get_rect(center=self.screen_rect.center)
@@ -289,35 +289,44 @@ class MenuSystem:
 
         px, py = panel_rect.topleft
 
-        # Title
         title_img = self.tutorial_title_font.render("Controls", True, (255, 215, 0))
-        title_rect = title_img.get_rect(
-            centerx=px + panel_w // 2, top=py + 25)
+        title_rect = title_img.get_rect(centerx=px + panel_w // 2, top=py + 25)
         self.screen.blit(title_img, title_rect)
 
-        # Instruction rows
-        row_y = py + 95
-        for key_name, description in self.tutorial_instructions:
-            # Key name (bright blue)
+        row_y = py + 80
+        for key_name, description in self.tutorial_controls:
             key_img = self.tutorial_key_font.render(key_name, True, (100, 200, 255))
-            key_rect = key_img.get_rect(right=px + 170, centery=row_y + 12)
+            key_rect = key_img.get_rect(right=px + 160, centery=row_y + 12)
             self.screen.blit(key_img, key_rect)
 
-            # Separator
             sep_img = self.tutorial_key_font.render("-", True, (120, 120, 150))
-            sep_rect = sep_img.get_rect(centerx=px + 190, centery=row_y + 12)
+            sep_rect = sep_img.get_rect(centerx=px + 178, centery=row_y + 12)
             self.screen.blit(sep_img, sep_rect)
 
-            # Description
             desc_img = self.tutorial_desc_font.render(description, True, (220, 220, 220))
-            self.screen.blit(desc_img, (px + 210, row_y))
+            self.screen.blit(desc_img, (px + 196, row_y))
 
-            row_y += 55
+            row_y += 48
 
-        # Back button
-        self.btn_tutorial_back.draw_button(mouse_pos)
+        # Separator line
+        row_y += 8
+        pygame.draw.line(self.screen, (60, 60, 80),
+                         (px + 40, row_y), (px + panel_w - 40, row_y), 1)
+        row_y += 16
 
-        # Hint
+        # Tips section title
+        tips_title = self.tutorial_title_font.render("Tips", True, (255, 215, 0))
+        tips_title_rect = tips_title.get_rect(centerx=px + panel_w // 2, top=row_y)
+        self.screen.blit(tips_title, tips_title_rect)
+        row_y += 45
+
+        # Tips rows
+        for tip in self.tutorial_tips:
+            tip_img = self.hint_font.render(tip, True, (180, 180, 200))
+            tip_rect = tip_img.get_rect(centerx=px + panel_w // 2, centery=row_y + 8)
+            self.screen.blit(tip_img, tip_rect)
+            row_y += 30
+
         hint = self.hint_font.render("Press ESC to Return", True, (140, 140, 160))
         hint_rect = hint.get_rect()
         hint_rect.centerx = self.screen_rect.centerx
@@ -325,7 +334,5 @@ class MenuSystem:
         self.screen.blit(hint, hint_rect)
 
     def handle_tutorial_click(self, mouse_pos):
-        """Handle mouse clicks on tutorial screen, return action type"""
-        if self.btn_tutorial_back.is_clicked(mouse_pos):
-            return 'back'
+        """No buttons on tutorial screen — ESC only."""
         return None
