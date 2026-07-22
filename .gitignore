@@ -1,8 +1,5 @@
 __pycache__/
-high_score.dat
-player_data.dat
-savegame.dat
-upload_cache.dat
+saves/
 resource/videos/
 dist/
 build/

@@ -96,6 +96,13 @@ class AlienInvasion:
         self.save_notification_frames = 0  # 存档成功提示倒计时
         self.save_disabled = False         # 本次暂停中是否已存档
         self._notification_text = ''       # 提示文本
+        self.notifications = []            # 通知历史
+        self.show_notifications = False    # 是否显示通知面板
+
+        # 通知铃铛字体
+        self._font_small_bell = pygame.font.SysFont('Arial', 14)
+        self._font_title_bell = pygame.font.SysFont('Arial', 36, bold=True)
+        self._font_row_bell = pygame.font.SysFont('Arial', 20)
 
         # 开始播放背景音乐
         self.sound.play_bgm()
@@ -240,7 +247,18 @@ class AlienInvasion:
 
     def _check_mouse_click(self, mouse_pos):
         """根据当前状态路由鼠标点击事件"""
+        # 通知面板打开时：点击任何位置关闭
+        if self.show_notifications:
+            self.show_notifications = False
+            return
+
         if self.state == GameState.MENU:
+            # 铃铛点击（在菜单按钮之前检测）
+            if hasattr(self, 'notification_bell_rect') and \
+                    self.notification_bell_rect.collidepoint(mouse_pos):
+                self.show_notifications = True
+                return
+
             action = self.menu_system.handle_menu_click(mouse_pos)
             if action == 'start':
                 self._start_new_game()
@@ -734,7 +752,13 @@ class AlienInvasion:
 
         # ---------- MENU 状态 ----------
         elif self.state == GameState.MENU:
-            if event.key == pygame.K_ESCAPE:
+            if self.show_notifications:
+                if event.key == pygame.K_ESCAPE:
+                    self.show_notifications = False
+                elif event.key == pygame.K_c:
+                    self.notifications.clear()
+                    self.show_notifications = False
+            elif event.key == pygame.K_ESCAPE:
                 self._quit_game()
 
         # ---------- PLAYING 状态 ----------
@@ -1004,9 +1028,16 @@ class AlienInvasion:
             self.leaderboard_data = {'status': 'error', 'message': '无法连接服务器'}
 
     def _show_notification(self, message):
-        """在屏幕底部显示提示（复用存档提示系统）"""
+        """在屏幕底部显示提示并记录到通知历史"""
         self._notification_text = message
         self.save_notification_frames = 90
+        import time
+        self.notifications.append({
+            'text': message,
+            'time': time.strftime('%H:%M:%S'),
+        })
+        if len(self.notifications) > 20:
+            self.notifications = self.notifications[-20:]
 
     def _draw_leaderboard(self):
         """绘制排行榜覆盖层"""
@@ -1096,6 +1127,75 @@ class AlienInvasion:
         hint = font_hint.render("Press ESC to return", True, gray)
         hint_rect = hint.get_rect(
             centerx=screen_w // 2, bottom=screen_rect.bottom - 55)
+        self.screen.blit(hint, hint_rect)
+
+    def _draw_notification_bell(self):
+        """在主菜单右上角绘制通知铃铛"""
+        bell_x = self.screen.get_rect().right - 55
+        bell_y = 15
+        bell_r = 18
+        # 铃铛主体
+        pygame.draw.circle(self.screen, (200, 160, 60), (bell_x, bell_y + bell_r), bell_r)
+        pygame.draw.circle(self.screen, (240, 200, 80), (bell_x, bell_y + bell_r), bell_r - 4)
+        # 铃铛底部
+        pygame.draw.rect(self.screen, (180, 140, 50),
+                         (bell_x - 8, bell_y + bell_r - 8, 16, 6), border_radius=2)
+        # 铃舌
+        pygame.draw.circle(self.screen, (140, 100, 30),
+                           (bell_x, bell_y + bell_r + 8), 3)
+
+        # 未读角标
+        if self.notifications:
+            badge = self._font_small_bell.render(str(len(self.notifications)),
+                                                 True, (255, 255, 255))
+            badge_bg = badge.get_rect()
+            badge_bg.center = (bell_x + 14, bell_y + 4)
+            badge_bg = badge_bg.inflate(10, 6)
+            pygame.draw.rect(self.screen, (220, 50, 50), badge_bg, border_radius=8)
+            self.screen.blit(badge, (badge_bg.x + 5, badge_bg.y + 1))
+
+        return pygame.Rect(bell_x - bell_r, bell_y, bell_r * 2, bell_r * 2 + 15)
+
+    def _draw_notifications_panel(self):
+        """绘制通知面板覆盖层"""
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))
+        self.screen.blit(overlay, (0, 0))
+
+        screen_rect = self.screen.get_rect()
+        panel_w, panel_h = 460, 360
+        panel = pygame.Surface((panel_w, panel_h))
+        panel.fill((30, 35, 55))
+        panel_rect = panel.get_rect(center=screen_rect.center)
+        self.screen.blit(panel, panel_rect)
+
+        px, py = panel_rect.topleft
+        cx = px + panel_w // 2
+
+        font_title = self._font_title_bell
+        title = font_title.render("Notifications", True, (255, 215, 0))
+        self.screen.blit(title, (cx - title.get_width() // 2, py + 15))
+
+        font_row = self._font_row_bell
+
+        if not self.notifications:
+            empty = font_row.render("No notifications", True, (140, 140, 160))
+            self.screen.blit(empty, empty.get_rect(center=panel_rect.center))
+        else:
+            y = py + 55
+            for note in reversed(self.notifications[-10:]):
+                time_str = font_row.render(note['time'], True, (120, 120, 140))
+                text_str = font_row.render(note['text'][:42], True, (220, 220, 220))
+                self.screen.blit(time_str, (px + 25, y))
+                self.screen.blit(text_str, (px + 100, y))
+                y += 26
+                if y > py + panel_h - 55:
+                    break
+
+        # 关闭 / 清除按钮
+        hint = font_row.render("Click anywhere to close  |  C = Clear all",
+                               True, (140, 140, 160))
+        hint_rect = hint.get_rect(centerx=cx, bottom=py + panel_h - 12)
         self.screen.blit(hint, hint_rect)
 
     def _draw_save_notification(self):
@@ -1478,6 +1578,7 @@ class AlienInvasion:
             save_exists = Path(self.settings.save_file).exists()
             self.menu_system.draw_start_screen(
                 pygame.mouse.get_pos(), save_exists=save_exists)
+            self.notification_bell_rect = self._draw_notification_bell()
 
         elif self.state in (GameState.PLAYING, GameState.PAUSED):
             self._draw_game_scene()
@@ -1505,6 +1606,10 @@ class AlienInvasion:
         elif self.state == GameState.LEADERBOARD:
             self.menu_bg.draw()
             self._draw_leaderboard()
+
+        # 通知面板（覆盖一切）
+        if self.show_notifications:
+            self._draw_notifications_panel()
 
         # 底部提示
         if self.save_notification_frames > 0:

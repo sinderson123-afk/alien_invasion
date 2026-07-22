@@ -21,7 +21,9 @@ class PlayerData:
 
     def __init__(self, file_path=None):
         if file_path is None:
-            file_path = str(Path(os.path.dirname(sys.argv[0])) / "player_data.dat")
+            saves_dir = Path(os.path.dirname(sys.argv[0])) / "saves"
+            saves_dir.mkdir(exist_ok=True)
+            file_path = str(saves_dir / "player_data.dat")
         self.file_path = Path(file_path)
 
     def load(self):

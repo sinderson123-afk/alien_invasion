@@ -115,7 +115,6 @@ class Settings:
         # 计分设置
         self.alien_points = 50
         self.boss_points = 500              # Boss 击杀分数
-        self.high_score_file = str(Path(os.path.dirname(sys.argv[0])) / "high_score.dat")
 
         # 导弹设置
         self.missile_score_step = 500   # 每得500分奖励一枚导弹
@@ -215,15 +214,15 @@ class Settings:
         self.fail_banner_duration = 90      # 失败横幅显示帧数
 
         # --- 存档设置 ---
-        # 存档放在 exe 同目录（PyInstaller onefile 下 cwd 可能不固定）
-        self.save_file = str(Path(os.path.dirname(sys.argv[0])) / "savegame.dat")
+        self._saves_dir = Path(os.path.dirname(sys.argv[0])) / "saves"
+        self._saves_dir.mkdir(exist_ok=True)
+        self.save_file = str(self._saves_dir / "savegame.dat")
+        self.high_score_file = str(self._saves_dir / "high_score.dat")
 
         # --- 服务器设置 ---
         self.server_url = "https://alien-invasion-1018096304579.asia-east1.run.app"
 
         self.initialize_dynamic_settings()
-
-    def initialize_dynamic_settings(self):
         """初始化随游戏进行而变化的设置"""
         self.ship_speed = 1.5
         self.bullet_speed = 2.5

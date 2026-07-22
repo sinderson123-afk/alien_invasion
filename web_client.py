@@ -20,7 +20,9 @@ from urllib.parse import urljoin
 from file_crypto import encrypt_json, decrypt_json
 
 
-_CACHE_FILE = Path(os.path.dirname(sys.argv[0])) / "upload_cache.dat"
+_saves = Path(os.path.dirname(sys.argv[0])) / "saves"
+_saves.mkdir(exist_ok=True)
+_CACHE_FILE = _saves / "upload_cache.dat"
 _TIMEOUT = 8
 
 
