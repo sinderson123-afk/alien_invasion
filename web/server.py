@@ -1,5 +1,5 @@
 """Alien Invasion 云端服务器 — 邮箱验证码认证 + 排行榜 + 数据持久化
-
+Cloud Run 部署触发推送
 谷歌云部署（Cloud Run）：
     gunicorn -w 2 -b 0.0.0.0:$PORT server:app
 本地开发（需 Firestore 仿真器或服务账号密钥）：
