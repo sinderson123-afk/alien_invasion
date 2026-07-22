@@ -22,6 +22,7 @@ from menu import MenuSystem
 from meteor import Meteor, MeteorFragment
 import shop
 from web_client import WebClient
+from file_crypto import encrypt_json, decrypt_json
 from login_ui import LoginOverlay
 
 class AlienInvasion:
@@ -522,15 +523,14 @@ class AlienInvasion:
                 'lifetime': frag.lifetime,
             })
 
-        Path(self.settings.save_file).write_text(json.dumps(data, indent=2))
+        encrypt_json(data, Path(self.settings.save_file))
 
     def _resume_game(self):
-        """从 JSON 文件加载游戏状态并恢复运行"""
+        """从加密文件加载游戏状态并恢复运行"""
         path = Path(self.settings.save_file)
-        if not path.exists():
+        data = decrypt_json(path)
+        if data is None:
             return
-
-        data = json.loads(path.read_text())
 
         # --- 恢复统计信息 ---
         s = data['stats']

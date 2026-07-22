@@ -1,9 +1,19 @@
-"""玩家数据持久化：金币、道具、技能等级、认证信息"""
+"""玩家数据持久化：金币、道具、技能等级、认证信息（加密存储）"""
 
-import json
 import sys
 import os
 from pathlib import Path
+from file_crypto import encrypt_json, decrypt_json
+
+
+_DEFAULTS = {
+    'coins': 0,
+    'items': {'magnet': 0, 'shield': 0},
+    'skills': {'speed': 0, 'ammo': 0, 'vitality': 0},
+    'token': '',
+    'username': '',
+    'email': '',
+}
 
 
 class PlayerData:
@@ -11,54 +21,36 @@ class PlayerData:
 
     def __init__(self, file_path=None):
         if file_path is None:
-            file_path = str(Path(os.path.dirname(sys.argv[0])) / "player_data.json")
+            file_path = str(Path(os.path.dirname(sys.argv[0])) / "player_data.dat")
         self.file_path = Path(file_path)
 
     def load(self):
-        """加载玩家数据，文件不存在时返回默认值"""
-        try:
-            text = self.file_path.read_text()
-            data = json.loads(text)
-            return {
-                'coins': data.get('coins', 0),
-                'items': data.get('items', {'magnet': 0, 'shield': 0}),
-                'skills': data.get('skills', {'speed': 0, 'ammo': 0, 'vitality': 0}),
-                'token': data.get('token', ''),
-                'username': data.get('username', ''),
-                'email': data.get('email', ''),
-            }
-        except (OSError, ValueError):
-            return {
-                'coins': 0,
-                'items': {'magnet': 0, 'shield': 0},
-                'skills': {'speed': 0, 'ammo': 0, 'vitality': 0},
-                'token': '',
-                'username': '',
-                'email': '',
-            }
+        data = decrypt_json(self.file_path)
+        if data is None:
+            return dict(_DEFAULTS)
+        return {
+            'coins': data.get('coins', 0),
+            'items': data.get('items', {'magnet': 0, 'shield': 0}),
+            'skills': data.get('skills', {'speed': 0, 'ammo': 0, 'vitality': 0}),
+            'token': data.get('token', ''),
+            'username': data.get('username', ''),
+            'email': data.get('email', ''),
+        }
 
     def save(self, coins, items, skills, token='', username='', email=''):
         data = {'coins': coins, 'items': items, 'skills': skills}
+        existing = self.load()
         if token:
             data['token'] = token
             data['username'] = username
+        else:
+            data['token'] = existing.get('token', '')
+            data['username'] = existing.get('username', '')
         if email:
             data['email'] = email
-        try:
-            existing = {}
-            if self.file_path.exists():
-                try:
-                    existing = json.loads(self.file_path.read_text())
-                except (OSError, ValueError):
-                    pass
-            if not token:
-                data['token'] = existing.get('token', '')
-                data['username'] = existing.get('username', '')
-            if not email:
-                data['email'] = existing.get('email', '')
-            self.file_path.write_text(json.dumps(data))
-        except OSError:
-            pass
+        else:
+            data['email'] = existing.get('email', '')
+        encrypt_json(data, self.file_path)
 
     def save_auth(self, token: str, username: str):
         existing = self.load()

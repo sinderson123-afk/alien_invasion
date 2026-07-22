@@ -2,6 +2,7 @@ import json
 from enum import Enum, auto
 from pathlib import Path
 from player_data import PlayerData
+from file_crypto import encrypt_json, decrypt_json
 
 
 class GameState(Enum):
@@ -55,17 +56,11 @@ class GameStats:
 
     def _load_high_score(self):
         """从文件中读取最高分，文件不存在或损坏时返回0"""
-        path = Path(self.settings.high_score_file)
-        try:
-            return int(json.loads(path.read_text()))
-        except (OSError, ValueError):
+        data = decrypt_json(Path(self.settings.high_score_file))
+        if data is None:
             return 0
+        return data.get('high_score', 0)
 
     def save_high_score(self):
-        """将最高分写入文件"""
-        path = Path(self.settings.high_score_file)
-        try:
-            path.write_text(json.dumps(self.high_score))
-        except OSError:
-            # 写入失败（如磁盘只读）时不影响游戏继续运行
-            pass
+        """将最高分写入加密文件"""
+        encrypt_json({'high_score': self.high_score}, Path(self.settings.high_score_file))

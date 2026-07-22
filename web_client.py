@@ -17,9 +17,10 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin
+from file_crypto import encrypt_json, decrypt_json
 
 
-_CACHE_FILE = Path(os.path.dirname(sys.argv[0])) / "upload_cache.json"
+_CACHE_FILE = Path(os.path.dirname(sys.argv[0])) / "upload_cache.dat"
 _TIMEOUT = 8
 
 
@@ -34,16 +35,11 @@ class WebClient:
     # 本地缓存
     # ------------------------------------------------------------------
     def _load_cache(self) -> list:
-        try:
-            return json.loads(_CACHE_FILE.read_text())
-        except (OSError, ValueError):
-            return []
+        data = decrypt_json(_CACHE_FILE)
+        return data.get('uploads', []) if data else []
 
     def _save_cache(self):
-        try:
-            _CACHE_FILE.write_text(json.dumps(self._pending_uploads))
-        except OSError:
-            pass
+        encrypt_json({'uploads': self._pending_uploads}, _CACHE_FILE)
 
     # ------------------------------------------------------------------
     # HTTP 封装
