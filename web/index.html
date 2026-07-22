@@ -1,0 +1,3635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logan-AI 玻璃拟态日历空间</title>
+    <!-- 引入 Google Fonts 提升字体表现力 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==========================================
+           1. 核心设计系统与色彩变量
+           ========================================== */
+        :root {
+            /* 深色主题变量 (默认) */
+            --bg-gradient: radial-gradient(circle at 0% 0%, #0b0f19 0%, #030712 100%);
+            --card-bg: rgba(15, 23, 42, 0.45);
+            --card-border: rgba(255, 255, 255, 0.07);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-color: linear-gradient(135deg, #6366f1, #a855f7);
+            --accent-solid: #6366f1;
+            --accent-solid-hover: #4f46e5;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --hover-bg: rgba(255, 255, 255, 0.05);
+            --active-day-bg: rgba(99, 102, 241, 0.2);
+            --today-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(168, 85, 247, 0.35));
+            --input-bg: rgba(15, 23, 42, 0.6);
+            --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+            --shadow-premium: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            
+            --glass-blur: blur(25px);
+        }
+
+        body.light-mode {
+            /* 浅色主题变量 */
+            --bg-gradient: radial-gradient(circle at 0% 0%, #f8fafc 0%, #e2e8f0 100%);
+            --card-bg: rgba(255, 255, 255, 0.45);
+            --card-border: rgba(0, 0, 0, 0.07);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent-color: linear-gradient(135deg, #4f46e5, #7c3aed);
+            --accent-solid: #4f46e5;
+            --accent-solid-hover: #4338ca;
+            --accent-glow: rgba(79, 70, 229, 0.15);
+            --hover-bg: rgba(0, 0, 0, 0.04);
+            --active-day-bg: rgba(79, 70, 229, 0.12);
+            --today-bg: linear-gradient(135deg, rgba(79, 70, 229, 0.22), rgba(124, 58, 237, 0.22));
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+            --shadow-premium: 0 20px 50px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+
+        /* ==========================================
+           2. 基础页面排版与自适应滚动
+           ========================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--text-primary);
+            overflow-x: hidden;
+            position: relative;
+            padding: 20px;
+            transition: color 0.5s ease;
+        }
+
+        /* 统一过渡动效 */
+        body, .glass-card, button, input, textarea, span, p, div {
+            transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* ==========================================
+           3. 动态流体渐变背景 (Blobs Animation)
+           ========================================== */
+        .background-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            overflow: hidden;
+            background: var(--bg-gradient);
+            transition: background 0.5s ease;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.38;
+            animation: float 25s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+
+        .blob-1 {
+            width: 550px;
+            height: 550px;
+            background: rgba(99, 102, 241, 0.45); /* Indigo */
+            top: -10%;
+            left: -10%;
+            animation-duration: 25s;
+        }
+
+        body.light-mode .blob-1 {
+            background: rgba(129, 140, 248, 0.3);
+        }
+
+        .blob-2 {
+            width: 650px;
+            height: 650px;
+            background: rgba(168, 85, 247, 0.35); /* Purple */
+            bottom: -15%;
+            right: -10%;
+            animation-duration: 32s;
+        }
+
+        body.light-mode .blob-2 {
+            background: rgba(192, 132, 252, 0.25);
+        }
+
+        .blob-3 {
+            width: 450px;
+            height: 450px;
+            background: rgba(20, 184, 166, 0.28); /* Teal */
+            top: 40%;
+            left: 45%;
+            animation-duration: 20s;
+        }
+
+        body.light-mode .blob-3 {
+            background: rgba(45, 212, 191, 0.2);
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(80px, -50px) scale(1.15); }
+            100% { transform: translate(-40px, 60px) scale(0.9); }
+        }
+
+        /* ==========================================
+           4. 主卡片玻璃拟态容器
+           ========================================== */
+        .dashboard-container {
+            width: 100%;
+            max-width: 960px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 1;
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 顶部导航区 */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .brand-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: var(--accent-color);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-title svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--accent-solid);
+        }
+
+        /* 主体双栏网格 */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.25fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 820px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 玻璃卡片基类 */
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: var(--shadow-premium);
+        }
+
+        /* ==========================================
+           5. 左栏组件：时间、天气
+           ========================================== */
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 24px;
+        }
+
+        /* 实时时钟 */
+        .clock-widget {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .live-clock {
+            font-family: 'Outfit', sans-serif;
+            font-size: 56px;
+            font-weight: 600;
+            line-height: 1;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+            text-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .time-greeting {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .full-date {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        /* 天气组件 */
+        .weather-widget {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-mode .weather-widget {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .weather-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 1;
+        }
+
+        .weather-location {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .weather-location:hover {
+            color: var(--accent-solid);
+        }
+
+        .weather-location svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        .weather-temp-text {
+            font-size: 22px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
+        }
+
+        .weather-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .weather-visual {
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 城市搜索浮层 */
+        .city-search-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+            transform: translateY(101%);
+            transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 2;
+        }
+
+        .city-search-overlay.active {
+            transform: translateY(0);
+        }
+
+        .city-input {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+        }
+
+        .city-btn {
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .city-btn:hover {
+            opacity: 0.9;
+        }
+
+        .city-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+        }
+
+        /* ==========================================
+           6. 右栏组件：互动月历与备忘录
+           ========================================== */
+        .calendar-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 日历控制头 */
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .calendar-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        body.light-mode .nav-btn {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .nav-btn:hover {
+            background: var(--hover-bg);
+            color: var(--accent-solid);
+            transform: scale(1.05);
+        }
+
+        .nav-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        /* 星期表头 */
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        /* 日期网格 */
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            text-align: center;
+        }
+
+        .day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .day-cell:hover:not(.empty) {
+            background: var(--hover-bg);
+            transform: translateY(-1px);
+        }
+
+        .day-cell.empty {
+            cursor: default;
+        }
+
+        .day-cell.today {
+            background: var(--today-bg);
+            font-weight: 700;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+            color: var(--text-primary);
+        }
+
+        .day-cell.selected {
+            background: var(--active-day-bg);
+            border: 1.5px solid var(--accent-solid);
+            box-shadow: 0 0 12px var(--accent-glow);
+            font-weight: 600;
+        }
+
+        /* 便签提示小圆点 */
+        .memo-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--accent-solid);
+            position: absolute;
+            bottom: 6px;
+            box-shadow: 0 0 4px var(--accent-glow);
+        }
+
+        /* ==========================================
+           7. 备忘便签编辑区
+           ========================================== */
+        .memo-widget {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        body.light-mode .memo-widget {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .memo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .memo-date-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .memo-textarea {
+            width: 100%;
+            height: 70px;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            line-height: 1.6;
+        }
+
+        .memo-textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .memo-footer {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .save-memo-btn {
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px var(--accent-glow);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .save-memo-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .save-memo-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* ==========================================
+           8. 底部心灵金句卡片
+           ========================================== */
+        .footer-quote-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            padding: 24px 30px;
+        }
+
+        .quote-content-wrapper {
+            flex: 1;
+        }
+
+        .quote-text {
+            font-family: 'Noto Serif SC', 'Playfair Display', serif;
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.8;
+            color: var(--text-primary);
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        /* 金句切换动画类 */
+        .quote-text.transitioning {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+
+        .refresh-quote-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        body.light-mode .refresh-quote-btn {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .refresh-quote-btn:hover {
+            color: var(--accent-solid);
+            background: var(--hover-bg);
+            transform: scale(1.05);
+        }
+
+        .refresh-quote-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            transition: transform 0.6s ease;
+        }
+
+        /* 旋转动画 */
+        .refresh-quote-btn.spinning svg {
+            transform: rotate(360deg);
+        }
+
+        /* ==========================================
+           9. 主题切换器设计
+           ========================================== */
+        .theme-switch-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-premium);
+        }
+
+        .theme-switch-btn:hover {
+            background: var(--hover-bg);
+            transform: scale(1.05);
+        }
+
+        .theme-switch-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* 暗黑/明亮图标切换显示 */
+        .sun-icon { display: none; }
+        .moon-icon { display: block; }
+
+        body.light-mode .sun-icon { display: block; }
+        body.light-mode .moon-icon { display: none; }
+
+        /* ==========================================
+           10. SVG 天气图标动画
+           ========================================== */
+        .weather-svg {
+            width: 60px;
+            height: 60px;
+        }
+
+        /* 晴天 */
+        .sun-rays {
+            transform-origin: 32px 32px;
+            animation: spin 30s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 雨天 */
+        .rain-drop {
+            animation: fall 1.6s infinite linear;
+        }
+        @keyframes fall {
+            0% { transform: translateY(0); opacity: 0; }
+            45% { opacity: 1; }
+            100% { transform: translateY(12px); opacity: 0; }
+        }
+        .drop-1 { animation-delay: 0s; }
+        .drop-2 { animation-delay: 0.5s; }
+        .drop-3 { animation-delay: 1s; }
+
+        /* 雪天 */
+        .snowflake {
+            animation: drift 2.4s infinite linear;
+        }
+        @keyframes drift {
+            0% { transform: translateY(0) translateX(0); opacity: 0; }
+            40% { opacity: 1; }
+            100% { transform: translateY(10px) translateX(3px); opacity: 0; }
+        }
+        .snow-1 { animation-delay: 0s; }
+        .snow-2 { animation-delay: 0.8s; }
+        .snow-3 { animation-delay: 1.6s; }
+
+        /* 闪烁感应器（加载中） */
+        .sensor-pulse {
+            transform-origin: 32px 32px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 0.3; }
+        }
+
+        /* ==========================================
+           12. 效率工具箱 (计算器 & 计时器) 样式
+           ========================================== */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 820px) {
+            .tools-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tool-card {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px;
+            min-height: 410px;
+        }
+
+        .tool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tool-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+        }
+
+        /* 科学计算器样式 */
+        .calc-screen {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            height: 76px;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        body.light-mode .calc-screen {
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.03);
+        }
+
+        .calc-formula {
+            font-size: 13px;
+            color: var(--text-muted);
+            min-height: 16px;
+            letter-spacing: 0.5px;
+            width: 100%;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .calc-result {
+            font-size: 26px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 2px;
+            line-height: 1.1;
+            width: 100%;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .calc-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            flex: 1;
+        }
+
+        .calc-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            aspect-ratio: 1.45;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body.light-mode .calc-btn {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .calc-btn:hover {
+            background: var(--hover-bg);
+            transform: scale(1.03);
+        }
+
+        .calc-btn:active {
+            transform: scale(0.96);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        body.light-mode .calc-btn:active {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        /* 科学运算按钮 */
+        .sci-btn {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.02);
+            font-family: 'Inter', sans-serif;
+        }
+
+        body.light-mode .sci-btn {
+            background: rgba(0, 0, 0, 0.015);
+        }
+
+        /* 运算符按钮 */
+        .op-btn {
+            color: var(--accent-solid);
+            font-weight: 600;
+        }
+
+        .equal-btn {
+            background: var(--accent-color);
+            color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 4px 12px var(--accent-glow);
+            border: none;
+        }
+
+        .equal-btn:hover {
+            opacity: 0.95;
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        /* 计时器样式 */
+        .timer-tabs {
+            display: flex;
+            background: var(--input-bg);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+        }
+
+        .timer-tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .timer-tab-btn.active {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .timer-panel {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 16px;
+        }
+
+        .timer-panel.active {
+            display: flex;
+        }
+
+        /* 番茄钟环形进度条 */
+        .pomodoro-circle-wrapper {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pomodoro-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .p-track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.04);
+            stroke-width: 4.5;
+        }
+
+        body.light-mode .p-track {
+            stroke: rgba(0, 0, 0, 0.03);
+        }
+
+        .p-progress {
+            fill: none;
+            stroke: var(--accent-solid);
+            stroke-width: 4.5;
+            stroke-linecap: round;
+            stroke-dasharray: 326.7;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 0.35s linear;
+        }
+
+        .pomodoro-time-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #p-time {
+            font-family: 'Outfit', sans-serif;
+            font-size: 30px;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .pomodoro-state-label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        /* 计时器通用控制按钮 */
+        .timer-controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .timer-control-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        body.light-mode .timer-control-btn {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .timer-control-btn:hover {
+            background: var(--hover-bg);
+            color: var(--accent-solid);
+            transform: scale(1.06);
+        }
+
+        .timer-control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .timer-control-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* 滑杆设置 */
+        .p-settings {
+            width: 100%;
+            max-width: 200px;
+        }
+
+        .p-setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .p-setting-item input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 5px;
+            border-radius: 5px;
+            background: var(--input-bg);
+            outline: none;
+            border: 1px solid var(--card-border);
+        }
+
+        .p-setting-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: var(--accent-solid);
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--accent-glow);
+            transition: transform 0.1s ease;
+        }
+
+        .p-setting-item input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* 秒表独占样式 */
+        .stopwatch-display {
+            font-family: 'Outfit', sans-serif;
+            font-size: 38px;
+            font-weight: 500;
+            color: var(--text-primary);
+            min-height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sw-laps-wrapper {
+            width: 100%;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 8px 12px;
+            overflow-y: auto;
+        }
+
+        body.light-mode .sw-laps-wrapper {
+            background: rgba(0, 0, 0, 0.015);
+        }
+
+        /* 自定义微型滚动条 */
+        .sw-laps-wrapper::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sw-laps-wrapper::-webkit-scrollbar-track {
+            background: none;
+        }
+
+        .sw-laps-wrapper::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 10px;
+        }
+
+        .sw-laps-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .sw-lap-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+            padding-bottom: 4px;
+        }
+
+        body.light-mode .sw-lap-item {
+            border-bottom-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .sw-lap-item span.lap-index {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .sw-lap-item span.lap-time {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        /* ==========================================
+           13. 访问分析组件样式
+           ========================================== */
+        .visit-analytics-widget {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: auto; /* 自动推到最底部 */
+        }
+
+        body.light-mode .visit-analytics-widget {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .analytics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .analytics-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .analytics-count {
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--hover-bg);
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid var(--card-border);
+        }
+
+        .analytics-today {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .analytics-today span.accent-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            background: var(--accent-color);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 柱状图样式 */
+        .analytics-chart {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            height: 60px;
+            padding-top: 15px;
+            border-top: 1px dashed var(--card-border);
+        }
+
+        .chart-bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .chart-bar {
+            width: 14px;
+            background: var(--accent-color);
+            border-radius: 4px 4px 0 0;
+            height: 0; /* JS 动态控制 */
+            transition: height 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .chart-bar:hover::after {
+            content: attr(data-count) "次";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translate(-50%, -4px);
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            font-size: 10px;
+            font-family: 'Outfit', sans-serif;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 10;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        body.light-mode .chart-bar:hover::after {
+            background: rgba(255,255,255,0.9);
+            color: #000;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .chart-label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            transform: scale(0.9);
+        }
+	/* ==========================================
+           14. Alien Invasion 端游下载 & 排行榜样式
+           ========================================== */
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--accent-color);
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 28px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            box-shadow: 0 8px 20px var(--accent-glow);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.95;
+            box-shadow: 0 10px 25px var(--accent-glow);
+        }
+
+        .download-btn:active {
+            transform: translateY(1px);
+        }
+
+        .leaderboard-panel {
+            margin-top: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 16px 20px;
+        }
+
+        body.light-mode .leaderboard-panel {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .leaderboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .leaderboard-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .leaderboard-refresh {
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            background: none;
+            border: 1px solid var(--card-border);
+            padding: 3px 10px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .leaderboard-refresh:hover {
+            color: var(--accent-solid);
+            border-color: var(--accent-solid);
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .leaderboard-table th {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .leaderboard-table td {
+            font-size: 13px;
+            color: var(--text-secondary);
+            padding: 7px 8px;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+        }
+
+        body.light-mode .leaderboard-table td {
+            border-bottom-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .leaderboard-table tr:hover td {
+            background: var(--hover-bg);
+        }
+
+        .lb-rank { font-weight: 700; color: var(--text-primary); width: 32px; }
+        .lb-rank.top1 { color: #f59e0b; }
+        .lb-rank.top2 { color: #94a3b8; }
+        .lb-rank.top3 { color: #d97706; }
+
+        .lb-name { font-weight: 500; color: var(--text-primary); }
+        .lb-score { font-weight: 600; background: var(--accent-color); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .lb-level { font-size: 11px; color: var(--text-muted); }
+        .leaderboard-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0; }
+        .leaderboard-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+        .leaderboard-stats span { font-weight: 600; color: var(--text-secondary); }
+
+        /* ==========================================
+           11. 旅人的信笺游戏样式
+           ========================================== */
+        .game-card-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+            overflow: hidden;
+            padding: 24px 30px;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .game-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+        }
+
+        .game-title span {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-left: 6px;
+        }
+
+        .game-status {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--hover-bg);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--card-border);
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.4) 100%);
+        }
+
+        body.light-mode .canvas-wrapper {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.5) 100%);
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 180px;
+            cursor: pointer;
+        }
+
+        .game-instruction-overlay {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.95);
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: 10;
+        }
+
+        .game-instruction-overlay.fade-out {
+            opacity: 0;
+        }
+
+        .jump-key-hint {
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+            padding: 1px 5px;
+            background: rgba(255, 255, 255, 0.1);
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* 字母揭晓看板 */
+        .quote-reveal-board {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-height: 40px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            padding: 12px;
+            border-radius: 16px;
+        }
+
+        body.light-mode .quote-reveal-board {
+            background: rgba(0, 0, 0, 0.01);
+        }
+
+        .char-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px dashed var(--text-muted);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.5s ease;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .char-box.revealed {
+            border-style: solid;
+            border-color: var(--accent-solid);
+            background: var(--active-day-bg);
+            color: var(--text-primary);
+            box-shadow: 0 0 8px var(--accent-glow);
+            transform: scale(1.05);
+        }
+
+        /* 游戏结算弹窗 (玻璃拟态 Modal Overlay) */
+        .game-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: 20;
+            border-radius: 24px;
+        }
+
+        body.light-mode .game-modal {
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        .game-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .game-modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--shadow-premium);
+            transform: translateY(20px);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .game-modal.active .game-modal-content {
+            transform: translateY(0);
+        }
+
+        .envelope-art {
+            margin-bottom: 12px;
+        }
+
+        .envelope-svg {
+            width: 50px;
+            height: 50px;
+            animation: mail-bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes mail-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .game-modal-content h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .final-quote-text {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 15px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+        }
+
+        body.light-mode .final-quote-text {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .modal-btn {
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .write-btn {
+            background: var(--accent-color);
+            color: #fff;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .replay-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+        }
+
+        body.light-mode .replay-btn {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .modal-btn:active {
+            transform: translateY(1px);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 动态流体背景层 -->
+    <div class="background-glow">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="dashboard-container">
+        
+        <!-- 头部栏 -->
+        <header class="dashboard-header">
+            <div class="brand-title">
+                <!-- 日历图标 -->
+                <svg viewBox="0 0 24 24">
+                    <path d="M19,4H17V3a1,1,0,0,0-2,0V4H9V3A1,1,0,0,0,7,0V4H5A3,3,0,0,0,2,7V19a3,3,0,0,0,3,3H19a3,3,0,0,0,3-3V7A3,3,0,0,0,19,4Zm1,15a1,1,0,0,1-1,1H5a1,1,0,0,1-1-1V9H20ZM20,7H4V7A1,1,0,0,1,5,6H7V7A1,1,0,0,0,9,7V6h6V7a1,1,0,0,0,2,0V6h2a1,1,0,0,1,1,1Z"/>
+                </svg>
+                Logan-AI Space
+            </div>
+            
+            <!-- 主题切换按钮 -->
+            <button class="theme-switch-btn" id="theme-toggle" title="切换主题">
+                <!-- 月亮图标 (深色模式显示) -->
+                <svg class="moon-icon" viewBox="0 0 24 24">
+                    <path d="M12,2A10,10,0,0,0,22,12a9.76,9.76,0,0,0-.25,2.2A10,10,0,1,1,10.2,2.25,9.76,9.76,0,0,0,12,2Z"/>
+                </svg>
+                <!-- 太阳图标 (浅色模式显示) -->
+                <svg class="sun-icon" viewBox="0 0 24 24">
+                    <path d="M12,6.5A5.5,5.5,0,1,1,6.5,12,5.51,5.51,0,0,1,12,6.5M12,2a1,1,0,0,0-1,1V5a1,1,0,0,0,2,0V3a1,1,0,0,0-1-1Zm0,16a1,1,0,0,0-1,1v2a1,1,0,0,0,2,0V19a1,1,0,0,0-1-1ZM4.22,5.64A1,1,0,0,0,5.64,4.22L4.22,5.64Zm14.14,14.14a1,1,0,0,0,1.42-1.42l-1.42,1.42ZM2,12a1,1,0,0,0,1,1H5a1,1,0,0,0,0-2H3a1,1,0,0,0-1,1Zm16,0a1,1,0,0,0,1,1h2a1,1,0,0,0,0-2H19a1,1,0,0,0-1,1ZM5.64,19.78a1,1,0,0,0,1.42-1.42l-1.42,1.42ZM19.78,5.64a1,1,0,0,0-1.42-1.42l1.42,1.42Z"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- 双栏控制网格 -->
+        <main class="dashboard-grid">
+            
+            <!-- 左侧时间天气面板 -->
+            <section class="glass-card info-panel">
+                <!-- 时钟部分 -->
+                <div class="clock-widget">
+                    <div class="live-clock" id="live-clock">00:00:00</div>
+                    <div class="time-greeting" id="time-greeting">
+                        <span>正在初始化时间空间...</span>
+                    </div>
+                    <div class="full-date" id="full-date">----年--月--日</div>
+                </div>
+
+                <!-- 天气卡片 -->
+                <div class="weather-widget">
+                    <div class="weather-info">
+                        <div class="weather-location" id="weather-city-btn" title="点击更改城市">
+                            <span id="weather-city">定位中...</span>
+                            <!-- 定位/编辑图标 -->
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12,2a8,8,0,0,0-8,8c0,5.25,7,11.54,7.3,11.8a1,1,0,0,0,1.4,0C13,21.54,20,15.25,20,10A8,8,0,0,0,12,2Zm0,11a3,3,0,1,1,3-3A3,3,0,0,1,12,13Z"/>
+                            </svg>
+                        </div>
+                        <div class="weather-temp-text" id="weather-temp">--°C</div>
+                        <div class="weather-desc" id="weather-text">感知天气中...</div>
+                    </div>
+                    
+                    <!-- 动态 SVG 容器 -->
+                    <div class="weather-visual" id="weather-icon-container">
+                        <!-- 默认加载图标 -->
+                        <svg class="weather-svg sensor-pulse" viewBox="0 0 64 64">
+                            <circle cx="32" cy="32" r="16" fill="none" stroke="var(--text-muted)" stroke-width="4" stroke-dasharray="10 6"/>
+                            <circle cx="32" cy="32" r="4" fill="var(--text-secondary)"/>
+                        </svg>
+                    </div>
+
+                    <!-- 隐藏的城市搜索卡片 -->
+                    <div class="city-search-overlay" id="city-search-overlay">
+                        <input type="text" class="city-input" id="city-input" placeholder="输入城市拼音或汉字(如: beijing)">
+                        <button class="city-btn" id="city-submit-btn">确定</button>
+                        <button class="city-close-btn" id="city-close-btn">&times;</button>
+                    </div>
+                </div>
+
+                <!-- 访问量统计小卡片 -->
+                <div class="visit-analytics-widget">
+                    <div class="analytics-header">
+                        <div class="analytics-title">
+                            <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor; vertical-align:middle;">
+                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+                            </svg>
+                            访问分析
+                        </div>
+                        <div class="analytics-count" id="visit-total-count">总量: --</div>
+                    </div>
+                    
+                    <div class="analytics-today">
+                        今日访问：<span id="visit-today-count" class="accent-text">--</span> 次
+                    </div>
+
+                    <!-- 7天历史简约柱状图 -->
+                    <div class="analytics-chart" id="visit-chart-container">
+                        <!-- JS 动态渲染柱子 -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧互动月历与便签 -->
+            <section class="glass-card calendar-panel">
+                <!-- 日历导航 -->
+                <div class="calendar-header">
+                    <div class="calendar-title" id="calendar-month-year">2026年6月</div>
+                    <div class="calendar-nav">
+                        <button class="nav-btn" id="prev-month-btn" title="上个月">
+                            <svg viewBox="0 0 24 24"><path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"/></svg>
+                        </button>
+                        <button class="nav-btn" id="next-month-btn" title="下个月">
+                            <svg viewBox="0 0 24 24"><path d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 星期表头 -->
+                <div class="calendar-weekdays">
+                    <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                </div>
+
+                <!-- 日期网格 -->
+                <div class="calendar-days" id="calendar-days-grid"></div>
+
+                <!-- 备忘便签小部件 -->
+                <div class="memo-widget">
+                    <div class="memo-header">
+                        <div class="memo-date-title" id="memo-title">便签读取中...</div>
+                    </div>
+                    <textarea class="memo-textarea" id="memo-textarea" placeholder="记录下这天的计划、小美好或心情随笔吧..."></textarea>
+                    <div class="memo-footer">
+                        <button class="save-memo-btn" id="save-memo-btn">
+                            <!-- 保存图标 -->
+                            <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24">
+                                <path d="M15,9H5V5H15M12,19A3,3,0,1,1,15,16A3,3,0,0,1,12,19m5-16H5A2,2,0,0,0,3,5V19a2,2,0,0,0,2,2H19a2,2,0,0,0,2-2V7L17,3Z"/>
+                            </svg>
+                            保存备忘
+                        </button>
+                    </div>
+                </div>
+        </main>
+
+        <!-- 效率工具箱网格 -->
+        <section class="tools-grid">
+            <!-- 科学计算器 -->
+            <div class="glass-card tool-card calculator-card">
+                <div class="tool-header">
+                    <div class="tool-title">
+                        <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:6px;">
+                            <path d="M19 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 17h-2v-2h2v2zm0-4h-2v-2h2v2zm-4 4h-2v-2h2v2zm0-4h-2v-2h2v2zm-4 4H5v-2h2v2zm0-4H5v-2h2v2zm10-5H5V7h12v3z"/>
+                        </svg>
+                        科学计算器
+                    </div>
+                </div>
+                <!-- 显示屏 -->
+                <div class="calc-screen">
+                    <div class="calc-formula" id="calc-formula"></div>
+                    <div class="calc-result" id="calc-result">0</div>
+                </div>
+                <!-- 按键网格 -->
+                <div class="calc-buttons">
+                    <!-- 科学行1 -->
+                    <button class="calc-btn sci-btn" data-val="sin">sin</button>
+                    <button class="calc-btn sci-btn" data-val="cos">cos</button>
+                    <button class="calc-btn sci-btn" data-val="tan">tan</button>
+                    <button class="calc-btn op-btn" data-val="⌫">⌫</button>
+                    
+                    <!-- 科学行2 -->
+                    <button class="calc-btn sci-btn" data-val="ln">ln</button>
+                    <button class="calc-btn sci-btn" data-val="log">log</button>
+                    <button class="calc-btn sci-btn" data-val="^">^</button>
+                    <button class="calc-btn op-btn" data-val="C">C</button>
+                    
+                    <!-- 科学行3 -->
+                    <button class="calc-btn sci-btn" data-val="sqrt">√</button>
+                    <button class="calc-btn sci-btn" data-val="pi">π</button>
+                    <button class="calc-btn sci-btn" data-val="e">e</button>
+                    <button class="calc-btn op-btn" data-val="/">÷</button>
+                    
+                    <!-- 数字行1 -->
+                    <button class="calc-btn num-btn" data-val="7">7</button>
+                    <button class="calc-btn num-btn" data-val="8">8</button>
+                    <button class="calc-btn num-btn" data-val="9">9</button>
+                    <button class="calc-btn op-btn" data-val="*">×</button>
+                    
+                    <!-- 数字行2 -->
+                    <button class="calc-btn num-btn" data-val="4">4</button>
+                    <button class="calc-btn num-btn" data-val="5">5</button>
+                    <button class="calc-btn num-btn" data-val="6">6</button>
+                    <button class="calc-btn op-btn" data-val="-">-</button>
+                    
+                    <!-- 数字行3 -->
+                    <button class="calc-btn num-btn" data-val="1">1</button>
+                    <button class="calc-btn num-btn" data-val="2">2</button>
+                    <button class="calc-btn num-btn" data-val="3">3</button>
+                    <button class="calc-btn op-btn" data-val="+">+</button>
+                    
+                    <!-- 数字行4 -->
+                    <button class="calc-btn num-btn" data-val="(">(</button>
+                    <button class="calc-btn num-btn" data-val="0">0</button>
+                    <button class="calc-btn num-btn" data-val=")">)</button>
+                    <button class="calc-btn op-btn equal-btn" data-val="=">=</button>
+                </div>
+            </div>
+
+            <!-- 多功能计时器 -->
+            <div class="glass-card tool-card timer-card">
+                <!-- Tab 选择 -->
+                <div class="timer-tabs">
+                    <button class="timer-tab-btn active" data-tab="pomodoro">番茄钟</button>
+                    <button class="timer-tab-btn" data-tab="stopwatch">秒表</button>
+                </div>
+                
+                <!-- 番茄钟面板 -->
+                <div class="timer-panel active" id="panel-pomodoro">
+                    <div class="pomodoro-circle-wrapper">
+                        <!-- SVG 环形进度条 -->
+                        <svg class="pomodoro-svg" viewBox="0 0 120 120">
+                            <!-- 轨道圆圈 -->
+                            <circle class="p-track" cx="60" cy="60" r="52"></circle>
+                            <!-- 进度圆圈 -->
+                            <circle class="p-progress" id="p-progress-bar" cx="60" cy="60" r="52"></circle>
+                        </svg>
+                        <!-- 倒计时数字 -->
+                        <div class="pomodoro-time-display">
+                            <span id="p-time">25:00</span>
+                            <span class="pomodoro-state-label" id="p-state-label">FOCUS</span>
+                        </div>
+                    </div>
+                    <!-- 控制按钮 -->
+                    <div class="timer-controls">
+                        <button class="timer-control-btn" id="p-start-btn" title="开始/暂停">
+                            <svg viewBox="0 0 24 24"><path id="p-start-icon" d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <button class="timer-control-btn" id="p-reset-btn" title="重置">
+                            <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                        </button>
+                    </div>
+                    <!-- 时长设置小滑块 -->
+                    <div class="p-settings">
+                        <div class="p-setting-item">
+                            <span>专注时长 (分): <span id="p-focus-val">25</span></span>
+                            <input type="range" id="p-focus-input" min="1" max="60" value="25">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 秒表面板 -->
+                <div class="timer-panel" id="panel-stopwatch">
+                    <div class="stopwatch-display">
+                        <span id="sw-time">00:00.00</span>
+                    </div>
+                    <!-- 控制按钮 -->
+                    <div class="timer-controls">
+                        <button class="timer-control-btn" id="sw-start-btn" title="开始/暂停">
+                            <svg viewBox="0 0 24 24"><path id="sw-start-icon" d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <button class="timer-control-btn" id="sw-lap-btn" title="计次">
+                            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                        </button>
+                        <button class="timer-control-btn" id="sw-reset-btn" title="重置">
+                            <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                        </button>
+                    </div>
+                    <!-- 计次记录区 -->
+                    <div class="sw-laps-wrapper" id="sw-laps-wrapper">
+                        <ul class="sw-laps-list" id="sw-laps-list"></ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+	<!-- Alien Invasion 端游下载 & 排行榜卡片 -->
+        <section class="glass-card game-card-container">
+            <div class="game-header">
+                <div class="game-title">
+                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; vertical-align:middle; margin-right:6px;">
+                        <path d="M12,2A10,10,0,1,0,22,12,10,10,0,0,0,12,2Zm0,18a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z"/>
+                        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                    </svg>
+                    🎮 Alien Invasion <span>· PC 端游体验版</span>
+                </div>
+                <!-- GCP 服务器在线呼吸灯 -->
+                <div class="game-status" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">
+                    <span style="display:inline-block; width:6px; height:6px; background:#10b981; border-radius:50%; margin-right:4px; box-shadow: 0 0 8px #10b981;"></span>
+                    云端引擎运转中
+                </div>
+            </div>
+
+            <!-- 游戏下载横幅 -->
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; background: linear-gradient(180deg, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.4) 100%); border-radius: 16px; border: 1px solid var(--card-border); text-align: center;">
+                <h2 style="font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 700; margin-bottom: 8px; background: var(--accent-color); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">保卫宇宙，刻不容缓</h2>
+                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;">下载独立客户端，享受极致丝滑射击快感。战绩实时同步至 GCP 云端排行榜。</p>
+                
+                <!-- 替换 YOUR_GITHUB_USERNAME 为实际 GitHub 用户名 -->
+                <a href="https://github.com/sinderson-afk/alien_invasion/releases/latest/download/AlienInvasion.exe"
+                   class="download-btn" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    立即下载 (Windows AMD64)
+                </a>
+                <span style="font-family: 'Outfit', sans-serif; font-size: 12px; color: var(--text-muted); margin-top: 12px;">版本: v1.0.0 | 大小: 约 104MB</span>
+            </div>
+
+            <!-- 云端排行榜面板 -->
+            <div class="leaderboard-panel" id="leaderboard-panel">
+                <div class="leaderboard-header">
+                    <div class="leaderboard-title">
+                        <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle;">
+                            <path d="M12,2A10,10,0,1,0,22,12,10,10,0,0,0,12,2Zm0,18a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z"/>
+                            <path d="M12,6a3,3,0,0,0-3,3H9a3,3,0,0,0,6,0h0a3,3,0,0,0-3-3Zm0,8a4,4,0,0,0-4,4v1h8V18A4,4,0,0,0,12,14Z"/>
+                        </svg>
+                        全服排行榜
+                    </div>
+                    <button class="leaderboard-refresh" id="leaderboard-refresh-btn" title="向云端请求最新数据">同步数据</button>
+                </div>
+                <div id="leaderboard-content">
+                    <div class="leaderboard-empty">正在连接 GCP 云端服务器...</div>
+                </div>
+                <div class="leaderboard-stats" id="leaderboard-stats" style="display:none;">
+                    总玩家：<span id="lb-player-count">--</span>
+                    最高分：<span id="lb-highest-score">--</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- “旅人的信笺”游戏卡片 -->
+        <section class="glass-card game-card-container">
+            <div class="game-header">
+                <div class="game-title">
+                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; vertical-align:middle; margin-right:6px;">
+                        <path d="M12,16A3,3,0,1,0,9,13A3,3,0,0,0,12,16M19,2H5A3,3,0,0,0,2,5V19a3,3,0,0,0,3,3H19a3,3,0,0,0,3-3V5A3,3,0,0,0,19,2M12,18a5,5,0,1,1,5-5A5,5,0,0,1,12,18"/>
+                    </svg>
+                    旅人的信笺 <span>· 四季的低语</span>
+                </div>
+                <div class="game-status" id="game-status-text">
+                    已收集: <span id="game-collected-count">0</span>/<span id="game-total-count">0</span>
+                </div>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <canvas id="game-canvas"></canvas>
+                <!-- 游戏提示浮层 -->
+                <div class="game-instruction-overlay" id="game-instruction-overlay">
+                    <div class="instruction-content">
+                        <span class="jump-key-hint">SPACE</span> 或 <span class="click-hint">点击画面</span> 跳跃
+                    </div>
+                </div>
+            </div>
+
+            <!-- 信笺收集面板（文字拼凑） -->
+            <div class="quote-reveal-board" id="quote-reveal-board"></div>
+
+            <!-- 游戏结算弹窗 (Modal) -->
+            <div class="game-modal" id="game-modal">
+                <div class="game-modal-content">
+                    <div class="envelope-art">
+                        <!-- 绘制一个精美的 SVG 打开的信封 -->
+                        <svg viewBox="0 0 64 64" class="envelope-svg">
+                            <path d="M54 48H10a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4h44a4 4 0 0 1 4 4v24a4 4 0 0 1-4 4z" fill="var(--card-bg)" stroke="var(--accent-solid)" stroke-width="2"/>
+                            <path d="M6 20l26 16 26-16" fill="none" stroke="var(--accent-solid)" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3>收到一封旅人的来信</h3>
+                    <p class="final-quote-text" id="final-quote-text">“愿你在漫长的四季流转中，活成自己喜欢的模样。”</p>
+                    <div class="modal-buttons">
+                        <button class="modal-btn write-btn" id="modal-write-memo-btn">
+                            写入今日便签
+                        </button>
+                        <button class="modal-btn replay-btn" id="modal-replay-btn">
+                            再次启程
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 底部金句卡片 -->
+        <footer class="glass-card footer-quote-card">
+            <div class="quote-content-wrapper">
+                <p class="quote-text" id="quote-box">“温柔的话语加载中...”</p>
+            </div>
+            <button class="refresh-quote-btn" id="refresh-quote-btn" title="刷新今日金句">
+                <!-- 循环刷新图标 -->
+                <svg viewBox="0 0 24 24">
+                    <path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8,0,0,0,4,12A8,8,0,0,0,12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6,0,0,1,6,12A6,6,0,0,1,12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H21V3L17.65,6.35Z"/>
+                </svg>
+            </button>
+        </footer>
+
+    </div>
+
+    <!-- JavaScript 交互与数据逻辑 -->
+    <script>
+        // ==========================================
+        // 1. 初始化状态与本地存储加载
+        // ==========================================
+        let selectedDate = new Date(); // 当前选中的日期
+        let currentYear = selectedDate.getFullYear();
+        let currentMonth = selectedDate.getMonth(); // 0-indexed (0=一月)
+
+        const apiKey = "Sm3B_GbXZNk3C3D65"; 
+        let currentCity = localStorage.getItem("calendar_city") || "ip";
+
+        // ==========================================
+        // 2. 主题切换逻辑
+        // ==========================================
+        const themeToggleBtn = document.getElementById("theme-toggle");
+        
+        // 读取本地主题缓存
+        const cachedTheme = localStorage.getItem("calendar_theme");
+        if (cachedTheme === "light") {
+            document.body.classList.add("light-mode");
+        }
+
+        themeToggleBtn.addEventListener("click", () => {
+            document.body.classList.toggle("light-mode");
+            const isLight = document.body.classList.contains("light-mode");
+            localStorage.setItem("calendar_theme", isLight ? "light" : "dark");
+        });
+
+        // ==========================================
+        // 3. 实时时钟、精确日期与问候语
+        // ==========================================
+        const liveClock = document.getElementById("live-clock");
+        const fullDateElement = document.getElementById("full-date");
+        const timeGreeting = document.getElementById("time-greeting");
+
+        function updateClock() {
+            const now = new Date();
+            const hrs = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const secs = String(now.getSeconds()).padStart(2, '0');
+            liveClock.innerText = `${hrs}:${mins}:${secs}`;
+
+            // 格式化当前日期显示
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const days = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+            const dayOfWeek = days[now.getDay()];
+            fullDateElement.innerText = `${year}年${month}月${date}日 ${dayOfWeek}`;
+
+            // 根据小时计算问候语
+            const hour = now.getHours();
+            let greetingStr = "";
+            let greetingIcon = "";
+            if (hour >= 5 && hour < 11) {
+                greetingStr = "早上好，愿新的一天充满阳光！";
+                greetingIcon = "☀️";
+            } else if (hour >= 11 && hour < 13) {
+                greetingStr = "中午好，别忘了按时吃饭、休息一下。";
+                greetingIcon = "🍲";
+            } else if (hour >= 13 && hour < 17) {
+                greetingStr = "下午好，喝杯热茶继续前行吧。";
+                greetingIcon = "☕";
+            } else if (hour >= 17 && hour < 23) {
+                greetingStr = "晚上好，享受轻松惬意的夜晚吧。";
+                greetingIcon = "🌙";
+            } else {
+                greetingStr = "深夜了，早点休息，祝你好梦。";
+                greetingIcon = "✨";
+            }
+            timeGreeting.innerHTML = `<span>${greetingIcon} ${greetingStr}</span>`;
+        }
+
+        // 立即执行一次，并设立定时器
+        updateClock();
+        setInterval(updateClock, 1000);
+
+
+        // ==========================================
+        // 4. 天气管理与切换城市
+        // ==========================================
+        const weatherCityEl = document.getElementById("weather-city");
+        const weatherTempEl = document.getElementById("weather-temp");
+        const weatherTextEl = document.getElementById("weather-text");
+        const weatherIconContainer = document.getElementById("weather-icon-container");
+        
+        const citySearchOverlay = document.getElementById("city-search-overlay");
+        const weatherCityBtn = document.getElementById("weather-city-btn");
+        const cityInput = document.getElementById("city-input");
+        const citySubmitBtn = document.getElementById("city-submit-btn");
+        const cityCloseBtn = document.getElementById("city-close-btn");
+
+        // SVG 天气图标生成器
+        function getWeatherSVG(text) {
+            // 默认传感器转动
+            let svgContent = `
+                <svg class="weather-svg sensor-pulse" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="16" fill="none" stroke="var(--text-muted)" stroke-width="4" stroke-dasharray="10 6"/>
+                    <circle cx="32" cy="32" r="4" fill="var(--text-secondary)"/>
+                </svg>
+            `;
+            
+            if (text.includes("晴")) {
+                // 晴天
+                svgContent = `
+                    <svg class="weather-svg sunny" viewBox="0 0 64 64">
+                        <circle cx="32" cy="32" r="14" fill="#f59e0b"/>
+                        <path class="sun-rays" d="M32 8v4M32 52v4M8 32h4M52 32h4M15 15l3 3M46 46l3 3M15 49l3-3M46 18l3-3" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                `;
+            } else if (text.includes("多云") || text.includes("阴")) {
+                // 多云或阴天
+                svgContent = `
+                    <svg class="weather-svg cloudy" viewBox="0 0 64 64">
+                        <circle cx="24" cy="24" r="8" fill="#f59e0b" opacity="0.8"/>
+                        <path d="M46 38a9 9 0 0 0-3.6-17.1A12.5 12.5 0 0 0 18 24a9 9 0 0 0 0 18h26a7 7 0 0 0 2-14z" fill="#cbd5e1"/>
+                        <path d="M44 42a9 9 0 0 0-3.6-17.1A12.5 12.5 0 0 0 16 28a9 9 0 0 0 0 18h26a7 7 0 0 0 2-14z" fill="#94a3b8" opacity="0.85"/>
+                    </svg>
+                `;
+            } else if (text.includes("雨") || text.includes("雷") || text.includes("雹")) {
+                // 雨天
+                svgContent = `
+                    <svg class="weather-svg rainy" viewBox="0 0 64 64">
+                        <path d="M44 32a9 9 0 0 0-3.6-17.1A12.5 12.5 0 0 0 16 18a9 9 0 0 0 0 18h26a7 7 0 0 0 2-14z" fill="#64748b"/>
+                        <path class="rain-drop drop-1" d="M22 40v8" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+                        <path class="rain-drop drop-2" d="M32 42v8" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+                        <path class="rain-drop drop-3" d="M42 40v8" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+                    </svg>
+                `;
+            } else if (text.includes("雪") || text.includes("霜") || text.includes("冰")) {
+                // 雪天
+                svgContent = `
+                    <svg class="weather-svg snowy" viewBox="0 0 64 64">
+                        <path d="M44 32a9 9 0 0 0-3.6-17.1A12.5 12.5 0 0 0 16 18a9 9 0 0 0 0 18h26a7 7 0 0 0 2-14z" fill="#cbd5e1"/>
+                        <circle class="snowflake snow-1" cx="22" cy="42" r="2.5" fill="#fff"/>
+                        <circle class="snowflake snow-2" cx="32" cy="44" r="2.5" fill="#fff"/>
+                        <circle class="snowflake snow-3" cx="42" cy="42" r="2.5" fill="#fff"/>
+                    </svg>
+                `;
+            }
+            return svgContent;
+        }
+
+        // 异步获取天气
+        function fetchWeather(city) {
+            weatherTextEl.innerText = "天气感知中...";
+            weatherTempEl.innerText = "--°C";
+            if (city === "ip") {
+                weatherCityEl.innerText = "定位中...";
+            } else {
+                weatherCityEl.innerText = city.charAt(0).toUpperCase() + city.slice(1);
+            }
+            
+            const weatherUrl = `https://api.seniverse.com/v3/weather/now.json?key=${apiKey}&location=${encodeURIComponent(city)}&language=zh-Hans&unit=c`;
+
+            fetch(weatherUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error("API 请求失败");
+                    return response.json();
+                })
+                .then(data => {
+                    const temp = data.results[0].now.temperature; 
+                    const text = data.results[0].now.text; 
+                    const resolvedCity = data.results[0].location.name;
+
+                    weatherCityEl.innerText = resolvedCity;
+                    weatherTempEl.innerText = `${temp}°C`;
+                    weatherTextEl.innerText = text;
+                    
+                    // 渲染对应 SVG
+                    weatherIconContainer.innerHTML = getWeatherSVG(text);
+                    
+                    // 保存最新获取成功的城市
+                    localStorage.setItem("calendar_city", city);
+                    currentCity = city;
+                })
+                .catch(error => {
+                    console.error("天气数据获取失败: ", error);
+                    weatherCityEl.innerText = city;
+                    weatherTextEl.innerText = "暂无天气数据";
+                    weatherTempEl.innerText = "--°C";
+                    
+                    // 错误时显示灰色默认感应器图标
+                    weatherIconContainer.innerHTML = `
+                        <svg class="weather-svg" viewBox="0 0 64 64" style="opacity: 0.5;">
+                            <circle cx="32" cy="32" r="14" fill="none" stroke="var(--text-muted)" stroke-width="4" stroke-dasharray="5 5"/>
+                            <path d="M22 22 L42 42 M42 22 L22 42" stroke="var(--text-muted)" stroke-width="4" stroke-linecap="round"/>
+                        </svg>
+                    `;
+                });
+        }
+
+        // 搜索栏控制器
+        weatherCityBtn.addEventListener("click", () => {
+            citySearchOverlay.classList.add("active");
+            cityInput.value = "";
+            cityInput.focus();
+        });
+
+        cityCloseBtn.addEventListener("click", () => {
+            citySearchOverlay.classList.remove("active");
+        });
+
+        function handleCitySearch() {
+            const inputVal = cityInput.value.trim();
+            if (inputVal) {
+                fetchWeather(inputVal);
+            }
+            citySearchOverlay.classList.remove("active");
+        }
+
+        citySubmitBtn.addEventListener("click", handleCitySearch);
+        cityInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") handleCitySearch();
+        });
+
+        // 默认载入天气
+        fetchWeather(currentCity);
+
+
+        // ==========================================
+        // 5. 互动月历逻辑与渲染
+        // ==========================================
+        const calendarMonthYear = document.getElementById("calendar-month-year");
+        const calendarDaysGrid = document.getElementById("calendar-days-grid");
+        const prevMonthBtn = document.getElementById("prev-month-btn");
+        const nextMonthBtn = document.getElementById("next-month-btn");
+
+        const memoTitle = document.getElementById("memo-title");
+        const memoTextarea = document.getElementById("memo-textarea");
+        const saveMemoBtn = document.getElementById("save-memo-btn");
+
+        // 格式化日期字符串作为备忘存储 Key
+        function formatDateKey(year, month, day) {
+            return `calendar_memo_${year}_${String(month + 1).padStart(2, '0')}_${String(day).padStart(2, '0')}`;
+        }
+
+        // 渲染日历网格
+        function renderCalendar(year, month) {
+            calendarDaysGrid.innerHTML = "";
+            
+            // 设置标题
+            calendarMonthYear.innerText = `${year}年${month + 1}月`;
+
+            // 获取本月第一天是星期几
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            // 获取本月总天数
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            // 渲染前置空白格
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement("div");
+                emptyCell.classList.add("day-cell", "empty");
+                calendarDaysGrid.appendChild(emptyCell);
+            }
+
+            // 渲染当月天数
+            const today = new Date();
+            for (let day = 1; day <= totalDays; day++) {
+                const dayCell = document.createElement("div");
+                dayCell.classList.add("day-cell");
+                dayCell.innerText = day;
+
+                // 判断是否是今天
+                if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                    dayCell.classList.add("today");
+                }
+
+                // 判断是否是选中日期
+                if (day === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear()) {
+                    dayCell.classList.add("selected");
+                }
+
+                // 检查这天是否有便签记录，如有，加点小标记圆点
+                const memoKey = formatDateKey(year, month, day);
+                const hasMemo = localStorage.getItem(memoKey);
+                if (hasMemo && hasMemo.trim().length > 0) {
+                    const dot = document.createElement("span");
+                    dot.classList.add("memo-dot");
+                    dayCell.appendChild(dot);
+                }
+
+                // 点击事件：选中这天，并读取便签
+                dayCell.addEventListener("click", () => {
+                    // 清除之前的选中状态
+                    document.querySelectorAll(".day-cell.selected").forEach(el => el.classList.remove("selected"));
+                    
+                    dayCell.classList.add("selected");
+                    selectedDate = new Date(year, month, day);
+                    loadMemoForSelectedDate();
+                });
+
+                calendarDaysGrid.appendChild(dayCell);
+            }
+        }
+
+        // 切换月份监听
+        prevMonthBtn.addEventListener("click", () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar(currentYear, currentMonth);
+        });
+
+        nextMonthBtn.addEventListener("click", () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar(currentYear, currentMonth);
+        });
+
+
+        // ==========================================
+        // 6. 备忘便签逻辑 (localStorage)
+        // ==========================================
+        function loadMemoForSelectedDate() {
+            const y = selectedDate.getFullYear();
+            const m = selectedDate.getMonth();
+            const d = selectedDate.getDate();
+            
+            memoTitle.innerText = `✍️ ${m + 1}月${d}日 便签`;
+            
+            const memoKey = formatDateKey(y, m, d);
+            const savedText = localStorage.getItem(memoKey) || "";
+            memoTextarea.value = savedText;
+        }
+
+        saveMemoBtn.addEventListener("click", () => {
+            const y = selectedDate.getFullYear();
+            const m = selectedDate.getMonth();
+            const d = selectedDate.getDate();
+            const memoKey = formatDateKey(y, m, d);
+            const textVal = memoTextarea.value.trim();
+
+            if (textVal === "") {
+                localStorage.removeItem(memoKey);
+            } else {
+                localStorage.setItem(memoKey, textVal);
+            }
+
+            // 保存成功回馈
+            const originalText = saveMemoBtn.innerHTML;
+            saveMemoBtn.innerHTML = "✓ 已保存";
+            saveMemoBtn.style.opacity = "0.8";
+            
+            setTimeout(() => {
+                saveMemoBtn.innerHTML = originalText;
+                saveMemoBtn.style.opacity = "1";
+            }, 1200);
+
+            // 重新渲染日历，刷新记事指示点
+            renderCalendar(currentYear, currentMonth);
+        });
+
+
+        // ==========================================
+        // 7. 温柔金句与刷新动画
+        // ==========================================
+        const quotes = [
+            "哪怕魔法与时间都会消逝，但此刻吹过耳畔的风，依然温柔。",
+            "时间流转，有些风景与心意，永远在此停驻。",
+            "将今天的阳光折叠，寄给明天的自己。",
+            "在平淡的日子里，也要寻找闪闪发光的瞬间。",
+            "世界偶尔冷酷，但总有不期而遇的温暖。",
+            "生活收集起细碎的喜悦，织成我们温柔的日常。",
+            "去吹吹风吧，如果能清醒的话，感冒也无所谓。",
+            "我们都在奔赴各自不同的人生，愿你在漫长的岁月里终能得偿所愿。",
+            "前路浩浩荡荡，万物皆可期待。",
+            "慢品人间烟火色，闲观万事岁月长。",
+            "生活明朗，万物可爱，人间值得，未来可期。"
+        ];
+
+        const quoteBox = document.getElementById("quote-box");
+        const refreshQuoteBtn = document.getElementById("refresh-quote-btn");
+
+        function changeQuote() {
+            // 添加旋转和淡出样式
+            refreshQuoteBtn.classList.add("spinning");
+            quoteBox.classList.add("transitioning");
+
+            setTimeout(() => {
+                const randomIndex = Math.floor(Math.random() * quotes.length);
+                quoteBox.innerText = "“" + quotes[randomIndex] + "”";
+                
+                // 淡回
+                quoteBox.classList.remove("transitioning");
+            }, 300);
+
+            // 旋转完移除动画 class 以便下次点击
+            setTimeout(() => {
+                refreshQuoteBtn.classList.remove("spinning");
+            }, 600);
+        }
+
+        refreshQuoteBtn.addEventListener("click", changeQuote);
+
+        // ==========================================
+        // 8. 启动与初始装载
+        // ==========================================
+        // 随机一个首发金句
+        const randomIndex = Math.floor(Math.random() * quotes.length);
+        quoteBox.innerText = "“" + quotes[randomIndex] + "”";
+
+        // 加载当前日历和当前日期备忘
+        renderCalendar(currentYear, currentMonth);
+        loadMemoForSelectedDate();
+
+
+        // ==========================================
+        // 9. “旅人的信笺” 游戏引擎实现
+        // ==========================================
+        const gameCanvas = document.getElementById("game-canvas");
+        const gameCtx = gameCanvas.getContext("2d");
+        
+        // 游戏固定的画布物理分辨率，以适配各种屏幕伸缩并维持一致的物理碰撞
+        const internalWidth = 800;
+        const internalHeight = 180;
+        gameCanvas.width = internalWidth;
+        gameCanvas.height = internalHeight;
+
+        // 旅人寄语词库
+        const gameQuotes = [
+            "愿你在漫长的四季流转中，活成自己喜欢的模样。",
+            "今天的阳光很温柔，愿你也能被温柔以待。",
+            "慢品人间烟火色，闲观万事岁月长。",
+            "愿所有美好，都如期而至，温暖如初。",
+            "无论晴雨，愿你的心里始终有一片晴空。",
+            "时间很长，风景很美，慢慢走，别着急。",
+            "生活明朗，万物可爱，愿你今天顺心如意。"
+        ];
+
+        // 游戏核心状态
+        let isGameRunning = true;
+        let gameTime = 0;
+        let collectedCount = 0;
+        let gameTotalCount = 0;
+        let currentFullQuote = "";
+        let currentQuoteCharacters = []; // { char: string, revealed: boolean }
+        let letters = [];
+        let particles = [];
+        let letterSpawnTimer = 0;
+        const SEASON_DURATION = 1500; // 每个季节 25 秒 (1500 帧)
+
+        // 旅人物理数据
+        const traveler = {
+            x: 80,
+            y: 130, // ground line
+            vy: 0,
+            gravity: 0.45,
+            isJumping: false,
+            width: 20,
+            height: 30
+        };
+
+        // 四季配色方案与粒子配置
+        const seasonColors = [
+            // 春 (0)
+            {
+                skyTop: "#eef2ff", skyBottom: "#fce7f3", // Indigo -> Pink
+                hillFar: "#c7d2fe", hillNear: "#fbcfe8",
+                foliage: "#f472b6", ground: "#d9f99d", // 嫩红樱花、粉色山、淡绿草地
+                particleColor: "#f472b6", particleType: "blossom"
+            },
+            // 夏 (1)
+            {
+                skyTop: "#e0f2fe", skyBottom: "#bae6fd", // Cyan -> Blue
+                hillFar: "#7dd3fc", hillNear: "#38bdf8",
+                foliage: "#10b981", ground: "#a7f3d0", // 翠绿林木、浅碧草地
+                particleColor: "#34d399", particleType: "leaf"
+            },
+            // 秋 (2)
+            {
+                skyTop: "#fef3c7", skyBottom: "#ffedd5", // Amber -> Orange
+                hillFar: "#fcd34d", hillNear: "#fdba74",
+                foliage: "#f97316", ground: "#fef08a", // 橙色枫叶、金黄山岗
+                particleColor: "#f97316", particleType: "maple"
+            },
+            // 冬 (3)
+            {
+                skyTop: "#ecfeff", skyBottom: "#e2e8f0", // Light Cyan -> Slate
+                hillFar: "#cbd5e1", hillNear: "#94a3b8",
+                foliage: "#e2e8f0", ground: "#ffffff", // 白雪树木、银白地面
+                particleColor: "#ffffff", particleType: "snowflake"
+            }
+        ];
+
+        // 颜色渐变插值器 (Hex 转 RGB 并在过渡期过渡)
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            return {
+                r: (bigint >> 16) & 255,
+                g: (bigint >> 8) & 255,
+                b: bigint & 255
+            };
+        }
+
+        function lerpColor(hex1, hex2, factor) {
+            const r1 = hexToRgb(hex1);
+            const r2 = hexToRgb(hex2);
+            const r = r1.r + (r2.r - r1.r) * factor;
+            const g = r1.g + (r2.g - r1.g) * factor;
+            const b = r1.b + (r2.b - r1.b) * factor;
+            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        }
+
+        // 获取当前季节过渡态配色
+        function getSeasonState() {
+            const cycle = gameTime % (SEASON_DURATION * 4);
+            const seasonId = Math.floor(cycle / SEASON_DURATION);
+            const seasonProgress = (cycle % SEASON_DURATION) / SEASON_DURATION;
+
+            const current = seasonColors[seasonId];
+            const next = seasonColors[(seasonId + 1) % 4];
+
+            // 仅在季节最后 15% 的时间内进行平滑色彩渐变过渡
+            let factor = 0;
+            if (seasonProgress > 0.85) {
+                factor = (seasonProgress - 0.85) / 0.15;
+            }
+
+            return {
+                skyTop: lerpColor(current.skyTop, next.skyTop, factor),
+                skyBottom: lerpColor(current.skyBottom, next.skyBottom, factor),
+                hillFar: lerpColor(current.hillFar, next.hillFar, factor),
+                hillNear: lerpColor(current.hillNear, next.hillNear, factor),
+                foliage: lerpColor(current.foliage, next.foliage, factor),
+                ground: lerpColor(current.ground, next.ground, factor),
+                particleColor: current.particleColor,
+                particleType: current.particleType
+            };
+        }
+
+        // Web Audio API 八音盒清脆敲击声合成
+        function playCollectSound() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const audioCtx = new AudioContext();
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = "sine";
+                // 晶莹敲击音色：频率从 B5 快速划过到 B6
+                osc.frequency.setValueAtTime(987.77, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1975.53, audioCtx.currentTime + 0.12);
+                
+                gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.22);
+            } catch (e) {
+                console.error("Audio Context Error:", e);
+            }
+        }
+
+        // 收集粒子爆发特效
+        function spawnSparkles(x, y) {
+            for (let i = 0; i < 12; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 2.8 + 1.2;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 1.0, // 轻微向上弹射
+                    size: Math.random() * 3 + 2,
+                    alpha: 1.0,
+                    rotation: Math.random() * Math.PI * 2,
+                    spin: Math.random() * 0.1 - 0.05,
+                    type: "sparkle",
+                    color: "#fbbf24" // 亮金星光
+                });
+            }
+        }
+
+        // 更新并绘制季节粒子和撞击粒子
+        function drawParticles(state) {
+            // 背景飘落物生产 (花瓣、树叶、枫叶、雪花)
+            if (particles.length < 28 && Math.random() < 0.15) {
+                particles.push({
+                    x: internalWidth + 20,
+                    y: Math.random() * (internalHeight - 65) + 10,
+                    vx: -(Math.random() * 1.5 + 1.2),
+                    vy: Math.random() * 0.5 - 0.15,
+                    size: Math.random() * 4 + 3,
+                    alpha: Math.random() * 0.48 + 0.35,
+                    rotation: Math.random() * Math.PI * 2,
+                    spin: Math.random() * 0.04 - 0.02,
+                    type: state.particleType,
+                    color: state.particleColor
+                });
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.rotation += p.spin;
+
+                // 雪花随正弦摆动浮动
+                if (p.type === "snowflake") {
+                    p.x += Math.sin(gameTime * 0.03 + p.y) * 0.25;
+                }
+
+                // 爆发星光淡出与受重力影响下坠
+                if (p.type === "sparkle") {
+                    p.alpha -= 0.038;
+                    p.vy += 0.08;
+                    if (p.alpha <= 0) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                // 出界移除
+                if (p.x < -20 || p.y > internalHeight + 20) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                gameCtx.save();
+                gameCtx.globalAlpha = p.alpha;
+                gameCtx.fillStyle = p.color;
+                gameCtx.translate(p.x, p.y);
+                gameCtx.rotate(p.rotation);
+
+                if (p.type === "blossom" || p.type === "leaf" || p.type === "maple") {
+                    // 绘制椭圆叶片
+                    gameCtx.beginPath();
+                    gameCtx.ellipse(0, 0, p.size, p.size / 2, 0, 0, Math.PI * 2);
+                    gameCtx.fill();
+                } else if (p.type === "snowflake") {
+                    // 绘制晶体针状雪花
+                    gameCtx.strokeStyle = "#ffffff";
+                    gameCtx.lineWidth = 1.0;
+                    gameCtx.beginPath();
+                    for (let j = 0; j < 4; j++) {
+                        gameCtx.moveTo(-p.size / 2, 0);
+                        gameCtx.lineTo(p.size / 2, 0);
+                        gameCtx.rotate(Math.PI / 4);
+                    }
+                    gameCtx.stroke();
+                } else if (p.type === "sparkle") {
+                    // 绘制四角星闪烁
+                    gameCtx.fillStyle = p.color;
+                    gameCtx.beginPath();
+                    for (let j = 0; j < 4; j++) {
+                        gameCtx.lineTo(0, -p.size);
+                        gameCtx.lineTo(p.size / 3, -p.size / 3);
+                        gameCtx.rotate(Math.PI / 2);
+                    }
+                    gameCtx.closePath();
+                    gameCtx.fill();
+                }
+                gameCtx.restore();
+            }
+        }
+
+        // 初始化新关卡
+        function startNewGame() {
+            const randIndex = Math.floor(Math.random() * gameQuotes.length);
+            currentFullQuote = gameQuotes[randIndex];
+            
+            // 构建字符状态数组
+            currentQuoteCharacters = [];
+            for (let char of currentFullQuote) {
+                currentQuoteCharacters.push({
+                    char: char,
+                    revealed: (char === "，" || char === "。" || char === "？" || char === "！" || char === "、") // 标点默认揭晓
+                });
+            }
+
+            // 计算需要收集的文字字数
+            gameTotalCount = currentQuoteCharacters.filter(c => !c.revealed).length;
+            collectedCount = 0;
+            
+            // 重置实体与计时器
+            letters = [];
+            particles = [];
+            letterSpawnTimer = 0;
+            traveler.y = 130;
+            traveler.vy = 0;
+            traveler.isJumping = false;
+
+            // 更新 DOM 面板
+            document.getElementById("game-collected-count").innerText = "0";
+            document.getElementById("game-total-count").innerText = gameTotalCount;
+
+            updateRevealBoard();
+        }
+
+        // 字符揭晓面板渲染
+        function updateRevealBoard() {
+            const board = document.getElementById("quote-reveal-board");
+            board.innerHTML = "";
+            currentQuoteCharacters.forEach(item => {
+                const box = document.createElement("div");
+                box.classList.add("char-box");
+                if (item.revealed) {
+                    box.classList.add("revealed");
+                    box.innerText = item.char;
+                } else {
+                    box.innerText = "?";
+                }
+                board.appendChild(box);
+            });
+        }
+
+        // 渲染信笺
+        function drawLetters() {
+            // 定时生成信封
+            const gameModalActive = document.getElementById("game-modal").classList.contains("active");
+            if (collectedCount < gameTotalCount && !gameModalActive) {
+                letterSpawnTimer++;
+                if (letterSpawnTimer >= 150) { // 每 2.5 秒生成一个
+                    letterSpawnTimer = 0;
+                    // 寻找下一个未解锁字符索引
+                    const nextIndex = currentQuoteCharacters.findIndex(c => !c.revealed);
+                    if (nextIndex !== -1) {
+                        letters.push({
+                            x: internalWidth + 30,
+                            baseY: Math.random() * 60 + 35, // 漂浮在半空中
+                            phase: Math.random() * Math.PI * 2,
+                            width: 24,
+                            height: 16,
+                            collected: false,
+                            charIndex: nextIndex,
+                            char: currentQuoteCharacters[nextIndex].char
+                        });
+                    }
+                }
+            }
+
+            for (let i = letters.length - 1; i >= 0; i--) {
+                const L = letters[i];
+                L.x -= 2.2; // 缓步卷轴滚动速度
+                // 正弦曲线浮动
+                L.y = L.baseY + Math.sin(L.x * 0.025 + L.phase) * 12;
+
+                if (L.x < -30) {
+                    letters.splice(i, 1);
+                    continue;
+                }
+
+                // 物理碰撞检测 (AABB 近似与距离双校验)
+                const txCenter = 85;
+                const tyCenter = traveler.y - 15;
+                const dist = Math.hypot(L.x - txCenter, L.y - tyCenter);
+                
+                if (dist < 24 && !L.collected) {
+                    L.collected = true;
+                    collectedCount++;
+
+                    // 标记该位置文字已获取
+                    currentQuoteCharacters[L.charIndex].revealed = true;
+
+                    // 播放风铃与火花特效
+                    playCollectSound();
+                    spawnSparkles(L.x, L.y);
+
+                    // 刷新文字显示
+                    document.getElementById("game-collected-count").innerText = collectedCount;
+                    updateRevealBoard();
+
+                    // 全部集齐触发结算
+                    if (collectedCount === gameTotalCount) {
+                        setTimeout(showGameCompleteModal, 800);
+                    }
+
+                    letters.splice(i, 1);
+                    continue;
+                }
+
+                // 渲染信纸小信封
+                gameCtx.save();
+                gameCtx.shadowColor = "rgba(168, 85, 247, 0.4)";
+                gameCtx.shadowBlur = 8;
+                
+                gameCtx.fillStyle = "#ffffff";
+                gameCtx.strokeStyle = "#818cf8";
+                gameCtx.lineWidth = 1.2;
+
+                // 绘制信封本体
+                gameCtx.beginPath();
+                gameCtx.roundRect(L.x - L.width/2, L.y - L.height/2, L.width, L.height, 3);
+                gameCtx.fill();
+                gameCtx.stroke();
+
+                // 绘制信封翻盖折痕线
+                gameCtx.beginPath();
+                gameCtx.moveTo(L.x - L.width/2, L.y - L.height/2);
+                gameCtx.lineTo(L.x, L.y + 1);
+                gameCtx.lineTo(L.x + L.width/2, L.y - L.height/2);
+                gameCtx.stroke();
+
+                gameCtx.restore();
+            }
+        }
+
+        // 唤起通关结算信封
+        function showGameCompleteModal() {
+            document.getElementById("final-quote-text").innerText = `“${currentFullQuote}”`;
+            document.getElementById("game-modal").classList.add("active");
+        }
+
+        // 一键写入便签联动逻辑
+        document.getElementById("modal-write-memo-btn").addEventListener("click", () => {
+            const memoArea = document.getElementById("memo-textarea");
+            const nowContent = memoArea.value.trim();
+            const quoteText = `【旅人的信笺寄语】\n“${currentFullQuote}”`;
+
+            if (nowContent.includes(currentFullQuote)) {
+                alert("这段寄语已经在您今日的便签中了哦 ✍️");
+                return;
+            }
+
+            if (nowContent === "") {
+                memoArea.value = quoteText;
+            } else {
+                memoArea.value = nowContent + "\n\n" + quoteText;
+            }
+
+            // 联动点击真实的“保存备忘”按钮
+            document.getElementById("save-memo-btn").click();
+
+            // 成功状态动效
+            const writeBtn = document.getElementById("modal-write-memo-btn");
+            const originalText = writeBtn.innerHTML;
+            writeBtn.innerHTML = "✓ 已写入日历";
+            writeBtn.style.opacity = "0.75";
+
+            setTimeout(() => {
+                writeBtn.innerHTML = originalText;
+                writeBtn.style.opacity = "1";
+                document.getElementById("game-modal").classList.remove("active");
+                startNewGame();
+            }, 1300);
+        });
+
+        // 再次启程
+        document.getElementById("modal-replay-btn").addEventListener("click", () => {
+            document.getElementById("game-modal").classList.remove("active");
+            startNewGame();
+        });
+
+        // 键盘/触摸交互绑定
+        let userInteracted = false;
+        const instructionOverlay = document.getElementById("game-instruction-overlay");
+
+        function triggerJump() {
+            if (!userInteracted) {
+                userInteracted = true;
+                instructionOverlay.classList.add("fade-out");
+            }
+            if (!traveler.isJumping) {
+                traveler.vy = -8.2; // 向上初速度
+                traveler.isJumping = true;
+            }
+        }
+
+        gameCanvas.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            triggerJump();
+        });
+
+        gameCanvas.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            triggerJump();
+        });
+
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space") {
+                // 如果当前用户的光标停留在便签输入框或城市输入框，不拦截空格跳跃
+                const activeEl = document.activeElement;
+                if (activeEl !== document.getElementById("memo-textarea") && 
+                    activeEl !== document.getElementById("city-input")) {
+                    e.preventDefault();
+                    triggerJump();
+                }
+            }
+        });
+
+        // 核心游戏循环渲染
+        function updateGame() {
+            if (!isGameRunning) return;
+            gameTime++;
+
+            // 1. 获取当前插值过渡后的四季背景状态
+            const state = getSeasonState();
+
+            // 2. 清理画布，填色天空
+            gameCtx.clearRect(0, 0, internalWidth, internalHeight);
+            const skyGrad = gameCtx.createLinearGradient(0, 0, 0, internalHeight);
+            skyGrad.addColorStop(0, state.skyTop);
+            skyGrad.addColorStop(1, state.skyBottom);
+            gameCtx.fillStyle = skyGrad;
+            gameCtx.fillRect(0, 0, internalWidth, internalHeight);
+
+            // 3. 远景群山视差绘制 (速度系数: 0.2)
+            gameCtx.fillStyle = state.hillFar;
+            gameCtx.beginPath();
+            const offsetFar = (gameTime * 0.2) % 800;
+            gameCtx.moveTo(-offsetFar, internalHeight);
+            for (let x = 0; x <= internalWidth + 800; x += 40) {
+                const y = 92 + Math.sin(x * 0.005) * 18;
+                gameCtx.lineTo(x - offsetFar, y);
+            }
+            gameCtx.lineTo(internalWidth + 800 - offsetFar, internalHeight);
+            gameCtx.closePath();
+            gameCtx.fill();
+
+            // 4. 中景树木与树冠视差绘制 (速度系数: 0.5)
+            const offsetMid = (gameTime * 0.5) % 900;
+            for (let i = 0; i < 8; i++) {
+                const treeX = i * 150 - offsetMid + 80;
+                // 树干
+                gameCtx.fillStyle = "rgba(120, 80, 50, 0.4)";
+                gameCtx.fillRect(treeX - 2.5, 112, 5, 20);
+                
+                // 蓬松的圆形云朵状树冠 (颜色跟随季节)
+                gameCtx.fillStyle = state.foliage;
+                gameCtx.beginPath();
+                gameCtx.arc(treeX, 105, 15, 0, Math.PI * 2);
+                gameCtx.arc(treeX - 8, 97, 11, 0, Math.PI * 2);
+                gameCtx.arc(treeX + 8, 97, 11, 0, Math.PI * 2);
+                gameCtx.fill();
+            }
+
+            // 5. 绘制飘浮粒子与爆发特效
+            drawParticles(state);
+
+            // 6. 近景地面视差绘制 (速度系数: 1.0)
+            gameCtx.fillStyle = state.ground;
+            gameCtx.fillRect(0, 130, internalWidth, 50);
+            
+            // 地表线条
+            gameCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--card-border').trim() || "rgba(255,255,255,0.08)";
+            gameCtx.lineWidth = 1.0;
+            gameCtx.beginPath();
+            gameCtx.moveTo(0, 130);
+            gameCtx.lineTo(internalWidth, 130);
+            gameCtx.stroke();
+
+            // 地表浮动草丝
+            gameCtx.strokeStyle = state.foliage;
+            gameCtx.lineWidth = 1.2;
+            const offsetGround = (gameTime * 1.0) % 300;
+            for (let i = 0; i < 7; i++) {
+                const gx = i * 140 - offsetGround + 40;
+                gameCtx.beginPath();
+                gameCtx.moveTo(gx, 130);
+                gameCtx.lineTo(gx - 2, 123);
+                gameCtx.moveTo(gx, 130);
+                gameCtx.lineTo(gx + 2, 121);
+                gameCtx.stroke();
+            }
+
+            // 7. 旅人主角动画更新与绘制
+            // 应用重力与弹跳物理
+            if (traveler.isJumping) {
+                traveler.vy += traveler.gravity;
+                traveler.y += traveler.vy;
+                if (traveler.y >= 130) {
+                    traveler.y = 130;
+                    traveler.vy = 0;
+                    traveler.isJumping = false;
+                }
+            }
+
+            // 计算行走微幅上下跃动
+            let bob = 0;
+            let stickAngle = 0;
+            if (!traveler.isJumping) {
+                bob = Math.sin(gameTime * 0.15) * 2.5;
+                stickAngle = Math.sin(gameTime * 0.15) * 0.22;
+            } else {
+                stickAngle = 0.22;
+            }
+
+            const ty = traveler.y + bob;
+            const primaryTextColor = getComputedStyle(document.body).getPropertyValue('--text-primary').trim() || "#f8fafc";
+            const secondaryTextColor = getComputedStyle(document.body).getPropertyValue('--text-secondary').trim() || "#94a3b8";
+
+            // 绘制小背包
+            gameCtx.fillStyle = "rgba(99, 102, 241, 0.75)";
+            gameCtx.beginPath();
+            gameCtx.roundRect(traveler.x - 7, ty - 22, 5, 11, 2);
+            gameCtx.fill();
+
+            // 绘制小斗篷身体 (颜色自适应明暗主题)
+            gameCtx.fillStyle = primaryTextColor;
+            gameCtx.beginPath();
+            gameCtx.moveTo(traveler.x - 4, ty);
+            gameCtx.lineTo(traveler.x - 1, ty - 24);
+            gameCtx.lineTo(traveler.x + 9, ty - 24);
+            gameCtx.lineTo(traveler.x + 12, ty);
+            gameCtx.closePath();
+            gameCtx.fill();
+
+            // 斗篷内衬/阴影
+            gameCtx.fillStyle = secondaryTextColor;
+            gameCtx.fillRect(traveler.x + 2, ty - 18, 4, 18);
+
+            // 绘制小脸
+            gameCtx.fillStyle = "#fed7aa";
+            gameCtx.beginPath();
+            gameCtx.arc(traveler.x + 4, ty - 28, 4, 0, Math.PI * 2);
+            gameCtx.fill();
+
+            // 绘制小草帽 (金黄色)
+            gameCtx.fillStyle = "#eab308";
+            // 帽檐
+            gameCtx.beginPath();
+            gameCtx.ellipse(traveler.x + 4, ty - 31, 10, 2.5, 0, 0, Math.PI * 2);
+            gameCtx.fill();
+            // 帽顶
+            gameCtx.beginPath();
+            gameCtx.arc(traveler.x + 4, ty - 32, 4.5, Math.PI, 0);
+            gameCtx.fill();
+
+            // 绘制旅行杖 (深木褐色)
+            gameCtx.strokeStyle = "#78350f";
+            gameCtx.lineWidth = 1.8;
+            gameCtx.beginPath();
+            gameCtx.moveTo(traveler.x + 10, ty - 4);
+            const sx = traveler.x + 10 + Math.sin(stickAngle) * 6;
+            const sy = ty - 20 + Math.cos(stickAngle) * 2;
+            gameCtx.lineTo(sx, sy);
+            gameCtx.stroke();
+
+            // 8. 渲染风中的信笺并检测碰撞
+            drawLetters();
+
+            requestAnimationFrame(updateGame);
+        }
+
+        // 游戏启动
+        startNewGame();
+        updateGame();
+
+
+        // ==========================================
+        // 10. 科学计算器 JavaScript 逻辑
+        // ==========================================
+        const calcFormulaEl = document.getElementById("calc-formula");
+        const calcResultEl = document.getElementById("calc-result");
+        const calcButtons = document.querySelectorAll(".calc-btn");
+        let calcFormulaStr = "";
+        let isNewCalculation = false;
+
+        calcButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const val = btn.getAttribute("data-val");
+                
+                if (val === "C") {
+                    calcFormulaStr = "";
+                    calcFormulaEl.innerText = "";
+                    calcResultEl.innerText = "0";
+                    isNewCalculation = false;
+                } else if (val === "⌫") {
+                    if (calcFormulaStr.endsWith("sin(") || calcFormulaStr.endsWith("cos(") || calcFormulaStr.endsWith("tan(") || calcFormulaStr.endsWith("log(") || calcFormulaStr.endsWith("sqrt(")) {
+                        calcFormulaStr = calcFormulaStr.slice(0, -4);
+                    } else if (calcFormulaStr.endsWith("ln(")) {
+                        calcFormulaStr = calcFormulaStr.slice(0, -3);
+                    } else {
+                        calcFormulaStr = calcFormulaStr.slice(0, -1);
+                    }
+                    calcFormulaEl.innerText = calcFormulaStr;
+                    isNewCalculation = false;
+                } else if (val === "=") {
+                    evaluateCalc();
+                } else {
+                    if (isNewCalculation) {
+                        // 如果在得出结果后输入新数字/函数，自动清空上一式；如果是运算符，则继续在结果后运算
+                        if (["+", "-", "*", "/", "^"].includes(val)) {
+                            calcFormulaStr = calcResultEl.innerText;
+                        } else {
+                            calcFormulaStr = "";
+                        }
+                        isNewCalculation = false;
+                    }
+
+                    // 规范显示名，追加到输入式
+                    if (["sin", "cos", "tan", "log", "ln", "sqrt"].includes(val)) {
+                        calcFormulaStr += val + "(";
+                    } else if (val === "*") {
+                        calcFormulaStr += "×";
+                    } else if (val === "/") {
+                        calcFormulaStr += "÷";
+                    } else {
+                        calcFormulaStr += val;
+                    }
+                    calcFormulaEl.innerText = calcFormulaStr;
+                }
+            });
+        });
+
+        // 绑定键盘输入支持
+        window.addEventListener("keydown", (e) => {
+            const activeEl = document.activeElement;
+            if (activeEl === document.getElementById("memo-textarea") || activeEl === document.getElementById("city-input")) {
+                return; // 忽略输入框输入
+            }
+
+            const key = e.key;
+            if (key >= "0" && key <= "9" || ["+", "-", "(", ")", "."].includes(key)) {
+                e.preventDefault();
+                simulateCalcClick(key);
+            } else if (key === "*") {
+                e.preventDefault();
+                simulateCalcClick("*");
+            } else if (key === "/") {
+                e.preventDefault();
+                simulateCalcClick("/");
+            } else if (key === "Enter" || key === "=") {
+                e.preventDefault();
+                simulateCalcClick("=");
+            } else if (key === "Backspace") {
+                e.preventDefault();
+                simulateCalcClick("⌫");
+            } else if (key === "Escape") {
+                e.preventDefault();
+                simulateCalcClick("C");
+            }
+        });
+
+        function simulateCalcClick(val) {
+            const btn = Array.from(calcButtons).find(b => b.getAttribute("data-val") === val);
+            if (btn) btn.click();
+        }
+
+        // 安全数学算式求值
+        function evaluateCalc() {
+            if (!calcFormulaStr) return;
+
+            // 替换汉字/特制符号为 Javascript Math 的解析字段
+            let jsStr = calcFormulaStr
+                .replace(/×/g, "*")
+                .replace(/÷/g, "/")
+                .replace(/sin\(/g, "Math.sin(")
+                .replace(/cos\(/g, "Math.cos(")
+                .replace(/tan\(/g, "Math.tan(")
+                .replace(/log\(/g, "Math.log10(")
+                .replace(/ln\(/g, "Math.log(")
+                .replace(/sqrt\(/g, "Math.sqrt(")
+                .replace(/\^/g, "**")
+                .replace(/π/g, "Math.PI")
+                .replace(/e/g, "Math.E");
+
+            // 安全过滤验证：过滤除数字、运算符、括号、空格、数学函数名以及乘方外所有的多余代码
+            const cleaned = jsStr
+                .replace(/Math\.(sin|cos|tan|log|log10|sqrt|PI|E)/g, "")
+                .replace(/[0-9.+\-*\/()\s\*\*]/g, "");
+
+            if (cleaned.length === 0) {
+                try {
+                    let result = new Function(`return (${jsStr})`)();
+                    if (typeof result === "number") {
+                        if (isNaN(result) || !isFinite(result)) {
+                            calcResultEl.innerText = "Error";
+                        } else {
+                            // 精确保留8位有效数字，消除浮点数精度误差并除去多余末尾 0
+                            calcResultEl.innerText = Number(result.toFixed(8)).toString();
+                        }
+                    } else {
+                        calcResultEl.innerText = "Error";
+                    }
+                } catch (err) {
+                    calcResultEl.innerText = "Error";
+                }
+            } else {
+                calcResultEl.innerText = "Error";
+            }
+            isNewCalculation = true;
+        }
+
+
+        // ==========================================
+        // 11. 多功能计时器 (番茄工作法 & 秒表) JS 逻辑
+        // ==========================================
+        
+        // Tab 标签页切换逻辑
+        const tabBtns = document.querySelectorAll(".timer-tab-btn");
+        const timerPanels = document.querySelectorAll(".timer-panel");
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                tabBtns.forEach(b => b.classList.remove("active"));
+                timerPanels.forEach(p => p.classList.remove("active"));
+                
+                btn.classList.add("active");
+                const targetTab = btn.getAttribute("data-tab");
+                document.getElementById(`panel-${targetTab}`).classList.add("active");
+            });
+        });
+
+        // ----------------- 番茄钟逻辑 -----------------
+        const pTimeEl = document.getElementById("p-time");
+        const pStateLabel = document.getElementById("p-state-label");
+        const pProgressBar = document.getElementById("p-progress-bar");
+        const pStartBtn = document.getElementById("p-start-btn");
+        const pStartIcon = document.getElementById("p-start-icon");
+        const pResetBtn = document.getElementById("p-reset-btn");
+        const pFocusInput = document.getElementById("p-focus-input");
+        const pFocusVal = document.getElementById("p-focus-val");
+
+        let pomodoroTimerId = null;
+        let pomodoroMode = "FOCUS"; // FOCUS / BREAK
+        let focusDuration = 25 * 60; // 默认 25 分钟
+        let breakDuration = 5 * 60;  // 默认 5 分钟
+        let pTimeLeft = focusDuration;
+        let pTotalTime = focusDuration;
+        let pIsRunning = false;
+
+        // 圆形进度条总周长 2 * PI * r (52) = 326.72
+        const circleStrokeLength = 326.72;
+
+        function updatePomodoroUI() {
+            const mins = String(Math.floor(pTimeLeft / 60)).padStart(2, '0');
+            const secs = String(pTimeLeft % 60).padStart(2, '0');
+            pTimeEl.innerText = `${mins}:${secs}`;
+            pStateLabel.innerText = pomodoroMode;
+
+            // 更新环形进度条的 stroke-dashoffset
+            const percent = pTimeLeft / pTotalTime;
+            const offset = circleStrokeLength * (1 - percent);
+            pProgressBar.style.strokeDashoffset = offset;
+        }
+
+        function playTimerDoneSound() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const audioCtx = new AudioContext();
+
+                // 水晶和弦 - 第一声 E5 (659.25Hz)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.type = "sine";
+                osc1.frequency.setValueAtTime(659.25, audioCtx.currentTime);
+                gain1.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc1.start();
+                osc1.stop(audioCtx.currentTime + 0.32);
+
+                // 第二声 A5 (880.00Hz) 在 180 毫秒后响起
+                setTimeout(() => {
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.type = "sine";
+                    osc2.frequency.setValueAtTime(880.00, audioCtx.currentTime);
+                    gain2.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                    osc2.start();
+                    osc2.stop(audioCtx.currentTime + 0.42);
+                }, 180);
+            } catch (e) {
+                console.error("Audio Playback Error:", e);
+            }
+        }
+
+        pStartBtn.addEventListener("click", () => {
+            if (pIsRunning) {
+                // 暂停
+                clearInterval(pomodoroTimerId);
+                pIsRunning = false;
+                pStartIcon.setAttribute("d", "M8 5v14l11-7z"); // 播放图标
+            } else {
+                // 开始
+                pIsRunning = true;
+                pStartIcon.setAttribute("d", "M6 19h4V5H6v14zm8-14v14h4V5h-4z"); // 暂停图标
+                
+                // 定时器以每秒倒计
+                pomodoroTimerId = setInterval(() => {
+                    pTimeLeft--;
+                    if (pTimeLeft <= 0) {
+                        playTimerDoneSound();
+                        if (pomodoroMode === "FOCUS") {
+                            // 专注期结束，切换为休息期
+                            pomodoroMode = "BREAK";
+                            pTimeLeft = breakDuration;
+                            pTotalTime = breakDuration;
+                            alert("☀️ 专注时间结束，休息一下吧！");
+                        } else {
+                            // 休息期结束，切换为专注期
+                            pomodoroMode = "FOCUS";
+                            pTimeLeft = focusDuration;
+                            pTotalTime = focusDuration;
+                            alert("📖 休息结束，重新开始专注吧！");
+                        }
+                    }
+                    updatePomodoroUI();
+                }, 1000);
+            }
+        });
+
+        pResetBtn.addEventListener("click", () => {
+            clearInterval(pomodoroTimerId);
+            pIsRunning = false;
+            pomodoroMode = "FOCUS";
+            pTimeLeft = focusDuration;
+            pTotalTime = focusDuration;
+            pStartIcon.setAttribute("d", "M8 5v14l11-7z"); // 播放图标
+            updatePomodoroUI();
+        });
+
+        pFocusInput.addEventListener("input", (e) => {
+            const val = parseInt(e.target.value);
+            pFocusVal.innerText = val;
+            focusDuration = val * 60;
+            if (!pIsRunning && pomodoroMode === "FOCUS") {
+                pTimeLeft = focusDuration;
+                pTotalTime = focusDuration;
+                updatePomodoroUI();
+            }
+        });
+
+        // 初始更新番茄钟 UI
+        updatePomodoroUI();
+
+
+        // ----------------- 秒表逻辑 -----------------
+        const swTimeEl = document.getElementById("sw-time");
+        const swStartBtn = document.getElementById("sw-start-btn");
+        const swStartIcon = document.getElementById("sw-start-icon");
+        const swLapBtn = document.getElementById("sw-lap-btn");
+        const swResetBtn = document.getElementById("sw-reset-btn");
+        const swLapsList = document.getElementById("sw-laps-list");
+        const swLapsWrapper = document.getElementById("sw-laps-wrapper");
+
+        let swIsRunning = false;
+        let swStartTime = 0;
+        let swAccumulatedTime = 0;
+        let swTimerId = null;
+        let lapCount = 0;
+
+        function updateStopwatch() {
+            const elapsed = Date.now() - swStartTime + swAccumulatedTime;
+            swTimeEl.innerText = formatStopwatchTime(elapsed);
+        }
+
+        function formatStopwatchTime(ms) {
+            let totalSecs = Math.floor(ms / 1000);
+            let centis = Math.floor((ms % 1000) / 10);
+            let secs = totalSecs % 60;
+            let mins = Math.floor(totalSecs / 60);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
+        }
+
+        swStartBtn.addEventListener("click", () => {
+            if (swIsRunning) {
+                // 暂停
+                clearInterval(swTimerId);
+                swAccumulatedTime += Date.now() - swStartTime;
+                swIsRunning = false;
+                swStartIcon.setAttribute("d", "M8 5v14l11-7z"); // 播放图标
+            } else {
+                // 开始
+                swStartTime = Date.now();
+                swIsRunning = true;
+                swStartIcon.setAttribute("d", "M6 19h4V5H6v14zm8-14v14h4V5h-4z"); // 暂停图标
+                swTimerId = setInterval(updateStopwatch, 10); // 10毫秒更新一次
+            }
+        });
+
+        swLapBtn.addEventListener("click", () => {
+            if (!swIsRunning && swAccumulatedTime === 0) return; // 没运行时不能记次
+            
+            lapCount++;
+            const currentMs = swIsRunning ? (Date.now() - swStartTime + swAccumulatedTime) : swAccumulatedTime;
+            const lapTimeFormatted = formatStopwatchTime(currentMs);
+
+            const li = document.createElement("li");
+            li.classList.add("sw-lap-item");
+            li.innerHTML = `
+                <span class="lap-index">计次 ${lapCount}</span>
+                <span class="lap-time">${lapTimeFormatted}</span>
+            `;
+            swLapsList.appendChild(li);
+
+            // 自动滚动到底部
+            swLapsWrapper.scrollTop = swLapsWrapper.scrollHeight;
+        });
+
+        swResetBtn.addEventListener("click", () => {
+            clearInterval(swTimerId);
+            swIsRunning = false;
+            swStartTime = 0;
+            swAccumulatedTime = 0;
+            lapCount = 0;
+            swTimeEl.innerText = "00:00.00";
+            swStartIcon.setAttribute("d", "M8 5v14l11-7z"); // 播放图标
+            swLapsList.innerHTML = "";
+        });
+
+        // ==========================================
+        // 12. 页面访问量统计 (Page Views Analytics) JS 逻辑
+        // ==========================================
+        (function() {
+            const totalCountEl = document.getElementById("visit-total-count");
+            const todayCountEl = document.getElementById("visit-today-count");
+            const chartContainer = document.getElementById("visit-chart-container");
+
+            // 1. 获取本地日期键 (精确至用户本地时区的 YYYY-MM-DD)
+            const d = new Date();
+            const todayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+            // 2. 获取并解析历史数据
+            let history = {};
+            try {
+                history = JSON.parse(localStorage.getItem("calendar_visit_history")) || {};
+            } catch (e) {
+                history = {};
+            }
+
+            let total = parseInt(localStorage.getItem("calendar_visit_total")) || 0;
+
+            // 3. 统计自增
+            history[todayKey] = (history[todayKey] || 0) + 1;
+            total += 1;
+
+            // 4. 清理 30 天以前的过期统计数据
+            const thirtyDaysAgoTime = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            for (let key in history) {
+                const keyTime = new Date(key).getTime();
+                if (isNaN(keyTime) || keyTime < thirtyDaysAgoTime) {
+                    delete history[key];
+                }
+            }
+
+            // 5. 写回本地存储
+            localStorage.setItem("calendar_visit_history", JSON.stringify(history));
+            localStorage.setItem("calendar_visit_total", total);
+
+            // 6. 渲染今日数与总量数据
+            todayCountEl.innerText = history[todayKey];
+            totalCountEl.innerText = `总量: ${total}`;
+
+            // 7. 渲染 7 天历史简约柱状图
+            const past7Days = [];
+            for (let i = 6; i >= 0; i--) {
+                const tempDate = new Date();
+                tempDate.setDate(tempDate.getDate() - i);
+                const dateStr = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`;
+                // 标签展示为 MM-DD
+                const labelStr = `${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`;
+                past7Days.push({ key: dateStr, label: labelStr });
+            }
+
+            // 找出这 7 天内的最大访问值（作为 100% 高度比例基准，最小为 1 以防除零）
+            const counts = past7Days.map(day => history[day.key] || 0);
+            const maxCount = Math.max(...counts, 1);
+
+            // 动态绘制柱子
+            chartContainer.innerHTML = "";
+            past7Days.forEach((day, index) => {
+                const count = history[day.key] || 0;
+                // 计算比例高度，设基准最小高度为 6%，以防 0 次访问时看不见柱体底座
+                const heightPercent = Math.max((count / maxCount) * 100, 6);
+
+                const wrapper = document.createElement("div");
+                wrapper.classList.add("chart-bar-wrapper");
+
+                const bar = document.createElement("div");
+                bar.classList.add("chart-bar");
+                bar.setAttribute("data-count", count);
+
+                // 设立微小的延迟，实现柱状图从底部依次“升起”的精美入场动画
+                setTimeout(() => {
+                    bar.style.height = `${heightPercent}%`;
+                }, 80 + index * 40);
+
+                const label = document.createElement("div");
+                label.classList.add("chart-label");
+                label.innerText = day.label;
+
+                wrapper.appendChild(bar);
+                wrapper.appendChild(label);
+                chartContainer.appendChild(wrapper);
+            });
+        })();
+	// ==========================================
+        // 14. 游戏排行榜通信 (对接 GCP 服务端)
+        // ==========================================
+        const SERVER_URL = "https://alien-server-1018096304579.asia-east1.run.app"; 
+        const lbContent = document.getElementById("leaderboard-content");
+        const lbStats = document.getElementById("leaderboard-stats");
+        const lbPlayerCount = document.getElementById("lb-player-count");
+        const lbHighestScore = document.getElementById("lb-highest-score");
+        const lbRefreshBtn = document.getElementById("leaderboard-refresh-btn");
+
+        function renderLeaderboard(data) {
+            if (!data || !data.leaderboard || data.leaderboard.length === 0) {
+                lbContent.innerHTML = '<div class="leaderboard-empty">还没有人留下足迹，快去下载游戏打个榜首吧！</div>';
+                lbStats.style.display = "none";
+                return;
+            }
+
+            const rankClasses = { 1: "top1", 2: "top2", 3: "top3" };
+            let html = `<table class="leaderboard-table">
+                <thead><tr><th>#</th><th>玩家</th><th>分数</th><th>关卡</th></tr></thead><tbody>`;
+            data.leaderboard.forEach((entry, idx) => {
+                const rank = idx + 1;
+                const rankCls = rankClasses[rank] || "";
+                const name = escapeHtml(entry.player_name);
+                const score = Number(entry.score).toLocaleString();
+                html += `<tr>
+                    <td class="lb-rank ${rankCls}">${rank}</td>
+                    <td class="lb-name">${name}</td>
+                    <td class="lb-score">${score}</td>
+                    <td class="lb-level">Lv.${entry.level}</td>
+                </tr>`;
+            });
+            html += "</tbody></table>";
+            lbContent.innerHTML = html;
+        }
+
+        function renderStats(data) {
+            if (data && data.status === "success" && data.data) {
+                lbPlayerCount.innerText = data.data.player_count.toLocaleString();
+                lbHighestScore.innerText = Number(data.data.highest_score).toLocaleString();
+                lbStats.style.display = "flex";
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function fetchLeaderboard() {
+            try {
+                // 向你的云端接口拉取前十名
+                const resp = await fetch(`${SERVER_URL}/api/leaderboard?limit=10`);
+                const data = await resp.json();
+                if (data.status === "success") {
+                    renderLeaderboard(data);
+                }
+            } catch (e) {
+                console.error("云端通信失败:", e);
+                lbContent.innerHTML = '<div class="leaderboard-empty" style="color: #ef4444;">连接云端服务器失败，请稍后再试。</div>';
+            }
+
+            try {
+                // 拉取全服数据概况
+                const resp = await fetch(`${SERVER_URL}/api/stats`);
+                const data = await resp.json();
+                renderStats(data);
+            } catch (e) {}
+        }
+
+        if (lbRefreshBtn) {
+            lbRefreshBtn.addEventListener("click", () => {
+                lbContent.innerHTML = '<div class="leaderboard-empty">正在向云端拉取最新数据...</div>';
+                fetchLeaderboard();
+            });
+        }
+
+        // 页面打开时立即获取一次，随后每 30 秒轮询同步一次
+        fetchLeaderboard();
+        setInterval(fetchLeaderboard, 30000);
+
+    </script>
+</body>
+</html>

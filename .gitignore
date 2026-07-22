@@ -1,0 +1,11 @@
+__pycache__/
+high_score.json
+player_data.json
+savegame.json
+upload_cache.json
+resource/videos/
+dist/
+build/
+build_temp/
+icon.ico
+.idea/
