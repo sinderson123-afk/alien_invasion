@@ -295,6 +295,7 @@ class LoginOverlay:
                 self._register_email = email
                 self._mode = MODE_REGISTER_CODE
                 self._active_field = 0
+                self._fields = ['', '', '', '']
                 self._status = '验证码已发送'
                 self._status_color = self._green
                 self._countdown = self._countdown_max
@@ -340,6 +341,7 @@ class LoginOverlay:
                 self._register_email = email
                 self._mode = MODE_RESET_CODE
                 self._active_field = 0
+                self._fields = ['', '', '', '']
                 self._status = '验证码已发送'
                 self._status_color = self._green
                 self._countdown = self._countdown_max

@@ -361,6 +361,9 @@ class AlienInvasion:
         """返回主菜单：保存数据，清理游戏实体，切换状态"""
         self._upload_current_stats()
         self.stats.save_high_score()
+        self.stats.score = 0
+        self.stats.kills = 0
+        self.sb.prep_score()
         self.bullets.empty()
         self.missiles.empty()
         self.aliens.empty()
@@ -713,6 +716,12 @@ class AlienInvasion:
         self.sb.prep_level()
         self.sb.prep_coins()
         self.sb.check_high_score()
+
+        # --- 二次确保：分数不会被任何中间步骤覆盖 ---
+        self.stats.score = s['score']
+        self.stats.ship_left = s['ship_left']
+        self.sb.prep_score()
+        self.sb.prep_hearts()
 
         # 切换到游戏状态
         self.state = GameState.PLAYING
