@@ -29,6 +29,9 @@ class LoginOverlay:
         self.username = ''
         self.email = ''
 
+        # 启用文本输入（中文输入法、@ 符号等）
+        pygame.key.start_text_input()
+
         # 自动登录（已有 token）
         saved_token = self.player_data.get_token()
         saved_username = self.player_data.get_username()

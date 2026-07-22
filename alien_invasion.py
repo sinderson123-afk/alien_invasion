@@ -226,6 +226,7 @@ class AlienInvasion:
                 if self.login_overlay.done:
                     self.state = GameState.MENU
                     self.login_overlay = None
+                    pygame.key.stop_text_input()
                 continue
 
             if event.type == pygame.KEYDOWN:
