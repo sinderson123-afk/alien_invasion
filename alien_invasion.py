@@ -1013,7 +1013,8 @@ class AlienInvasion:
         gray = (160, 160, 180)
         red = (220, 80, 80)
 
-        screen_w = self.screen_rect.width
+        screen_rect = self.screen.get_rect()
+        screen_w = screen_rect.width
         title = font_title.render("LEADERBOARD", True, gold)
         title_rect = title.get_rect(centerx=screen_w // 2, top=40)
         self.screen.blit(title, title_rect)
@@ -1022,13 +1023,13 @@ class AlienInvasion:
         if data is None or data.get('status') == 'error':
             msg = (data or {}).get('message', '正在加载...')
             err = font_row.render(msg, True, red)
-            err_rect = err.get_rect(center=self.screen_rect.center)
+            err_rect = err.get_rect(center=screen_rect.center)
             self.screen.blit(err, err_rect)
         else:
             entries = data.get('leaderboard', [])
             if not entries:
                 empty = font_row.render("暂无玩家数据", True, gray)
-                self.screen.blit(empty, empty.get_rect(center=self.screen_rect.center))
+                self.screen.blit(empty, empty.get_rect(center=screen_rect.center))
             else:
                 # 表头
                 y = 105
@@ -1048,7 +1049,7 @@ class AlienInvasion:
                 # 行
                 for i, entry in enumerate(entries):
                     y += 32
-                    if y > self.screen_rect.height - 60:
+                    if y > screen_rect.height - 60:
                         break
 
                     rank_color = gold if i < 3 else white
@@ -1076,13 +1077,13 @@ class AlienInvasion:
                     f"Total Players: {total}    Highest Score: {highest:,}",
                     True, gray)
                 stats_rect = stats.get_rect(
-                    centerx=screen_w // 2, bottom=self.screen_rect.bottom - 25)
+                    centerx=screen_w // 2, bottom=screen_rect.bottom - 25)
                 self.screen.blit(stats, stats_rect)
 
         # 提示
         hint = font_hint.render("Press ESC to return", True, gray)
         hint_rect = hint.get_rect(
-            centerx=screen_w // 2, bottom=self.screen_rect.bottom - 55)
+            centerx=screen_w // 2, bottom=screen_rect.bottom - 55)
         self.screen.blit(hint, hint_rect)
 
     def _draw_save_notification(self):
