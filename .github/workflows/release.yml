@@ -1,0 +1,70 @@
+name: Build and Release EXE
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'web/**'
+      - 'README.md'
+      - '.gitignore'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller pillow
+
+      - name: Convert icon
+        run: |
+          python -c "from PIL import Image; img=Image.open('resource/images/cover.png'); img.save('icon.ico',format='ICO',sizes=[(256,256)])"
+
+      - name: Build EXE
+        run: |
+          python -m PyInstaller --onefile --windowed --name AlienInvasion --icon=icon.ico --add-data "resource;resource" --hidden-import pygame --clean --noconfirm alien_invasion.py
+
+      - name: Delete old release asset
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const latest = releases.find(r => r.tag_name === 'v1.0.0' && !r.draft);
+            if (latest) {
+              for (const asset of latest.assets) {
+                if (asset.name === 'AlienInvasion.exe') {
+                  await github.rest.repos.deleteReleaseAsset({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    asset_id: asset.id,
+                  });
+                  console.log(`Deleted old asset: ${asset.name}`);
+                }
+              }
+            }
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: Latest Build
+          body: "${{ github.event.head_commit.message }}"
+          files: dist/AlienInvasion.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
