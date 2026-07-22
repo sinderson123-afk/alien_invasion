@@ -361,6 +361,8 @@ class AlienInvasion:
         """返回主菜单：保存数据，清理游戏实体，切换状态"""
         self._upload_current_stats()
         self.stats.save_high_score()
+        self.stats.score = 0
+        self.stats.kills = 0
         self.bullets.empty()
         self.missiles.empty()
         self.aliens.empty()
