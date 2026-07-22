@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import pygame
 
-from settings import Settings
+from settings import Settings, GAME_VERSION, IS_DEV_BUILD
 from ship import Ship
 from bullet import Bullet
 from missile import Missile
@@ -411,7 +411,7 @@ class AlienInvasion:
                 flashing_alien_id = None
 
         data = {
-            'version': 1,
+            'version': 2,  # 存档格式版本
             'stats': {
                 'score': self.stats.score,
                 'kills': self.stats.kills,
@@ -543,12 +543,24 @@ class AlienInvasion:
 
         encrypt_json(data, Path(self.settings.save_file))
 
+    @staticmethod
+    def _migrate_save(data: dict) -> dict:
+        """将旧版本存档迁移到最新格式。返回迁移后的数据。"""
+        save_ver = data.get('version', 1)
+        if save_ver < 2:
+            # v1 → v2: 保证所有字段存在（新字段给默认值）
+            data.setdefault('version', 2)
+            save_ver = 2
+        # 未来 v2 → v3 在此追加
+        return data
+
     def _resume_game(self):
         """从加密文件加载游戏状态并恢复运行"""
         path = Path(self.settings.save_file)
         data = decrypt_json(path)
         if data is None:
             return
+        data = AlienInvasion._migrate_save(data)
 
         # --- 恢复统计信息 ---
         s = data['stats']
@@ -1579,6 +1591,16 @@ class AlienInvasion:
             self.menu_system.draw_start_screen(
                 pygame.mouse.get_pos(), save_exists=save_exists)
             self.notification_bell_rect = self._draw_notification_bell()
+
+            # 版本号
+            ver_font = pygame.font.SysFont('Arial', 16)
+            ver_text = f"v{GAME_VERSION}"
+            if IS_DEV_BUILD:
+                ver_text += " DEV"
+            ver_img = ver_font.render(ver_text, True, (120, 120, 140))
+            ver_rect = ver_img.get_rect(bottom=self.screen.get_rect().bottom - 8,
+                                        left=12)
+            self.screen.blit(ver_img, ver_rect)
 
         elif self.state in (GameState.PLAYING, GameState.PAUSED):
             self._draw_game_scene()

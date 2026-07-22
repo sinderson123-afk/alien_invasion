@@ -3,6 +3,14 @@ import os
 from pathlib import Path
 
 
+GAME_VERSION = "1.0.0"
+
+try:
+    from _build_info import DEV_BUILD as IS_DEV_BUILD
+except ImportError:
+    IS_DEV_BUILD = False
+
+
 def resource_path(relative_path):
     """获取资源文件的绝对路径，兼容 PyInstaller 单文件打包"""
     if hasattr(sys, '_MEIPASS'):

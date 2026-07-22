@@ -7,14 +7,16 @@ on:
       - 'web/**'
       - 'README.md'
       - '.gitignore'
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  build-dev:
+    if: github.ref_type != 'tag'
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,18 +29,21 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pygame pyinstaller pillow
-          pip install -r requirements.txt
-          pip list | Select-String pygame
 
       - name: Convert icon
         run: |
           python -c "from PIL import Image; img=Image.open('resource/images/cover.png'); img.save('icon.ico',format='ICO',sizes=[(256,256)])"
 
-      - name: Build EXE
+      - name: Write build info (DEV)
         run: |
-          python -m PyInstaller --onefile --windowed --name AlienInvasion --icon=icon.ico --add-data "resource;resource" --collect-all pygame --hidden-import pygame --hidden-import pygame._sdl2 --hidden-import cv2 --clean --noconfirm alien_invasion.py
+          echo "DEV_BUILD = True" > _build_info.py
 
-      - name: Delete old release asset
+      - name: Build EXE (DEV)
+        run: |
+          $env:ALIEN_DEV_BUILD = "1"
+          python -m PyInstaller --onefile --windowed --name AlienInvasion --icon=icon.ico --add-data "resource;resource" --collect-all pygame --hidden-import pygame --hidden-import cv2 --clean --noconfirm alien_invasion.py
+
+      - name: Delete old dev asset
         uses: actions/github-script@v7
         with:
           script: |
@@ -46,26 +51,67 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            const latest = releases.find(r => r.tag_name === 'v1.0.0' && !r.draft);
-            if (latest) {
-              for (const asset of latest.assets) {
+            const dev = releases.find(r => r.tag_name === 'dev' && r.prerelease);
+            if (dev) {
+              for (const asset of dev.assets) {
                 if (asset.name === 'AlienInvasion.exe') {
                   await github.rest.repos.deleteReleaseAsset({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     asset_id: asset.id,
                   });
-                  console.log(`Deleted old asset: ${asset.name}`);
                 }
               }
             }
 
-      - name: Upload to Release
+      - name: Upload to DEV Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: Latest Build
-          body: "${{ github.event.head_commit.message }}"
+          tag_name: dev
+          name: Development Build
+          body: "自动构建: ${{ github.sha }}\n**仅供测试，请勿用于正常游玩**\n提交: ${{ github.event.head_commit.message }}"
           files: dist/AlienInvasion.exe
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pygame pyinstaller pillow
+
+      - name: Convert icon
+        run: |
+          python -c "from PIL import Image; img=Image.open('resource/images/cover.png'); img.save('icon.ico',format='ICO',sizes=[(256,256)])"
+
+      - name: Write build info (RELEASE)
+        run: |
+          echo "DEV_BUILD = False" > _build_info.py
+
+      - name: Build EXE (RELEASE)
+        run: |
+          python -m PyInstaller --onefile --windowed --name AlienInvasion --icon=icon.ico --add-data "resource;resource" --collect-all pygame --hidden-import pygame --hidden-import cv2 --clean --noconfirm alien_invasion.py
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: "正式版 ${{ github.ref_name }}\n${{ github.event.head_commit.message }}"
+          files: dist/AlienInvasion.exe
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

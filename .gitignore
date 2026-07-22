@@ -1,5 +1,6 @@
 __pycache__/
 saves/
+_build_info.py
 resource/videos/
 dist/
 build/
