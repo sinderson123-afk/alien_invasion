@@ -155,6 +155,7 @@ class MenuSystem:
             ("E",           "Launch homing missile"),
             ("M",           "Open / Close shop"),
             ("N",           "Activate magnet item"),
+            ("F5",          "Quick save game"),
             ("ESC",         "Pause / Save Game"),
         ]
 

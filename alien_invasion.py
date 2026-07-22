@@ -361,9 +361,6 @@ class AlienInvasion:
         """返回主菜单：保存数据，清理游戏实体，切换状态"""
         self._upload_current_stats()
         self.stats.save_high_score()
-        self.stats.score = 0
-        self.stats.kills = 0
-        self.sb.prep_score()
         self.bullets.empty()
         self.missiles.empty()
         self.aliens.empty()
@@ -764,6 +761,10 @@ class AlienInvasion:
                 self.state = GameState.SHOP
             elif event.key == pygame.K_n:
                 self._activate_magnet()
+            elif event.key == pygame.K_F5:
+                self.save_game()
+                self._notification_text = 'Game Saved!'
+                self.save_notification_frames = 60
 
         # ---------- PAUSED 状态 ----------
         elif self.state == GameState.PAUSED:
