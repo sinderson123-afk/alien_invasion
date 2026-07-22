@@ -217,7 +217,7 @@ class Settings:
         self.save_file = "savegame.json"
 
         # --- 服务器设置 ---
-        self.server_url = "https://alien-invasion-xxxxx-uc.a.run.app"
+        self.server_url = "https://alien-invasion-1018096304579.asia-east1.run.app"
 
         self.initialize_dynamic_settings()
 
