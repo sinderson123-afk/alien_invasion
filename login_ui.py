@@ -120,9 +120,32 @@ class LoginOverlay:
             return self._handle_click(event.pos)
         return False
 
+    # US 键盘 Shift 映射表（处理 stop_text_input 导致 unicode 不正确的问题）
+    _US_SHIFT_MAP = {
+        '`': '~', '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
+        '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
+        '-': '_', '=': '+', '[': '{', ']': '}', '\\': '|',
+        ';': ':', "'": '"', ',': '<', '.': '>', '/': '?',
+    }
+
     def _handle_key(self, event):
         labels = self._field_labels
         n_fields = len(labels)
+
+        # Ctrl+V 粘贴
+        ctrl = event.mod & pygame.KMOD_CTRL
+        if ctrl and event.key == pygame.K_v:
+            if self._active_field < n_fields:
+                try:
+                    import subprocess
+                    clip = subprocess.check_output(
+                        ['powershell', '-command', 'Get-Clipboard'],
+                        text=True, stderr=subprocess.DEVNULL).rstrip('\r\n')
+                    if clip:
+                        self._fields[self._active_field] += clip[:100]
+                except Exception:
+                    pass
+            return True
 
         if event.key == pygame.K_TAB:
             self._active_field = (self._active_field + 1) % (n_fields + 1)
@@ -135,7 +158,6 @@ class LoginOverlay:
 
         if event.key == pygame.K_ESCAPE:
             if self._mode != MODE_LOGIN:
-                # 返回到登录模式
                 self._mode = MODE_LOGIN
                 self._active_field = 0
                 self._status = ''
@@ -145,11 +167,12 @@ class LoginOverlay:
             return False
 
         if self._active_field >= n_fields:
-            return False  # 焦点在按钮上，不处理键盘输入
+            return False
 
         idx = self._active_field
         label = labels[idx]
         is_code = 'Code' in label
+        is_email = 'Email' in label
         max_len = self._field_max_len[idx]
 
         if event.key == pygame.K_BACKSPACE:
@@ -157,22 +180,30 @@ class LoginOverlay:
             self._cursor_timer = 0
             return True
 
-        if event.unicode and event.unicode.isprintable():
-            ch = event.unicode
-            current = self._fields[idx]
+        if not event.unicode or not event.unicode.isprintable():
+            return False
 
-            if is_code:
-                if not ch.isdigit():
-                    return True
-            elif ch == ' ':
+        ch = event.unicode
+        shift = event.mod & pygame.KMOD_SHIFT
+
+        # Shift 修正：stop_text_input 会导致 unicode 不反映 Shift 状态
+        if shift and len(ch) == 1 and ch in self._US_SHIFT_MAP:
+            ch = self._US_SHIFT_MAP[ch]
+
+        # 字符过滤
+        if is_email:
+            pass
+        elif is_code:
+            if not ch.isdigit():
                 return True
-
-            if len(current) < max_len:
-                self._fields[idx] += ch
-            self._cursor_timer = 0
+        elif ch == ' ':
             return True
 
-        return False
+        current = self._fields[idx]
+        if len(current) < max_len:
+            self._fields[idx] += ch
+        self._cursor_timer = 0
+        return True
 
     def _handle_click(self, pos):
         if not self._click_rects:
