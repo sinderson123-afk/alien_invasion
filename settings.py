@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 
-GAME_VERSION = "1.1.1"
+GAME_VERSION = "1.1.2"
 
 try:
     from _build_info import DEV_BUILD as IS_DEV_BUILD
@@ -29,6 +29,7 @@ class Settings:
 
         # Ship settings
         self.ship_speed = 1.5
+        self.ship_speed_max = 4.5          # Ship max speed cap
         self.ship_limit = 3
 
         # Bullet settings
@@ -40,6 +41,7 @@ class Settings:
 
         # Alien settings
         self.alien_speed = 1.0
+        self.alien_speed_max = 3.0         # Alien max speed cap
 
         # Alien swarm behavior (rates as multiples of alien_speed, scaled by increase_speed)
         self.aliens_per_wave = 22             # Number of aliens per wave
@@ -270,5 +272,9 @@ class Settings:
     def increase_speed(self):
         """Increase speed values"""
         self.ship_speed *= self.speedup_scale
+        if self.ship_speed > self.ship_speed_max:
+            self.ship_speed = self.ship_speed_max
         self.bullet_speed *= self.speedup_scale
         self.alien_speed *= self.speedup_scale
+        if self.alien_speed > self.alien_speed_max:
+            self.alien_speed = self.alien_speed_max

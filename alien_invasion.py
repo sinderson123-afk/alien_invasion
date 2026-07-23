@@ -354,6 +354,8 @@ class AlienInvasion:
         skills = self.stats.skills
         s = self.settings
         s.ship_speed *= (1 + skills['speed'] * 0.1)
+        if s.ship_speed > s.ship_speed_max:
+            s.ship_speed = s.ship_speed_max
         s.bullet_allowed = 3 + skills['ammo']
         # vitality (max HP) already handled in GameStats.reset_stats
 
@@ -621,9 +623,9 @@ class AlienInvasion:
 
         # --- Restore dynamic settings ---
         ss = data['settings']
-        self.settings.ship_speed = ss['ship_speed']
+        self.settings.ship_speed = min(ss['ship_speed'], self.settings.ship_speed_max)
         self.settings.bullet_speed = ss['bullet_speed']
-        self.settings.alien_speed = ss['alien_speed']
+        self.settings.alien_speed = min(ss['alien_speed'], self.settings.alien_speed_max)
         self.settings.bullet_allowed = ss['bullet_allowed']
 
         # --- Restore ship ---
