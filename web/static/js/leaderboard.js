@@ -1,7 +1,7 @@
 const SERVER_URL = "https://alien-invasion-1018096304579.asia-east1.run.app";
 let pollInterval = null;
 
-const MIRRORS = [
+const MIRROR_BASES = [
   "https://gh.llkk.cc/",
   "https://github.akams.cn/",
   "https://gh-proxy.com/",
@@ -10,71 +10,93 @@ const MIRRORS = [
 const GITHUB_RELEASE_BASE =
   "https://github.com/sinderson123-afk/alien_invasion/releases/download";
 
-// ─── Geo-IP detection ────────────────────────────────────────
+// ─── Speed test ──────────────────────────────────────────────
 
-async function isChinaIP() {
-  try {
-    const resp = await fetch("https://api.ip.sb/geoip", { signal: AbortSignal.timeout(3000) });
-    const data = await resp.json();
-    return data.country_code === "CN";
-  } catch {
-    return false;
+async function probeURL(url, timeout = 7000) {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const xhr = new XMLHttpRequest();
+    const timer = setTimeout(() => resolve(Infinity), timeout);
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState >= 3) {
+        clearTimeout(timer);
+        resolve(performance.now() - start);
+        xhr.abort();
+      }
+    };
+    xhr.onerror = xhr.ontimeout = xhr.onabort = () => {
+      clearTimeout(timer);
+      resolve(Infinity);
+    };
+    xhr.open("GET", url, true);
+    xhr.timeout = timeout;
+    xhr.send();
+  });
+}
+
+async function pickFastestDownload(tag) {
+  const basename = `/AlienInvasion.exe`;
+  const directUrl = `${GITHUB_RELEASE_BASE}/${tag}${basename}`;
+  const fullPath = `${GITHUB_RELEASE_BASE}/${tag}${basename}`;
+
+  const sources = [
+    { name: "GitHub Direct", build: () => directUrl },
+    ...MIRROR_BASES.map((base) => ({
+      name: new URL(base).hostname,
+      build: () => base + fullPath,
+    })),
+  ];
+
+  const probes = sources.map(async (src) => {
+    const url = src.build();
+    const ms = await probeURL(url);
+    return { name: src.name, url, ms };
+  });
+
+  const results = await Promise.all(probes);
+  results.sort((a, b) => a.ms - b.ms);
+
+  const winner = results[0];
+  if (winner.ms === Infinity) {
+    return { url: directUrl, results: [] };
   }
+  return { url: winner.url, results };
 }
 
-// ─── Mirror fallback download ────────────────────────────────
-
-function setupMirrorFallback(btn, directUrl) {
-  const mirroredUrls = MIRRORS.map(m => m + directUrl);
-  const allUrls = [directUrl, ...mirroredUrls];
-  let mirrorIdx = -1;
-
-  btn.addEventListener("click", async (e) => {
-    // First click goes to direct; if it fails (user comes back),
-    // try mirrors sequentially
-    if (mirrorIdx < 0) {
-      mirrorIdx = 0;
-      btn.href = allUrls[0];
-    }
-  });
-
-  // Double-click or right-click to cycle mirrors
-  btn.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    mirrorIdx = (mirrorIdx + 1) % allUrls.length;
-    btn.href = allUrls[mirrorIdx];
-    btn.title = `Mirror ${mirrorIdx + 1}/${allUrls.length}`;
-    return false;
-  });
-
-  btn.title = "Right-click to switch mirror";
-}
-
-// ─── Dynamic download link ───────────────────────────────────
+// ─── Download button ─────────────────────────────────────────
 
 async function updateDownloadLink() {
   const btn = document.querySelector(".download-btn");
   if (!btn) return;
 
+  const originalHTML = btn.innerHTML;
+
   try {
-    // Fetch version from Cloudflare Pages (fast, cached globally)
     const vResp = await fetch("/version.json");
     const verData = await vResp.json();
     const tag = verData.latest;
-    const directUrl = `${GITHUB_RELEASE_BASE}/${tag}/AlienInvasion.exe`;
 
-    const isCN = await isChinaIP();
+    btn.innerHTML =
+      '<span style="font-size:13px;">⏳ Testing mirrors...</span>';
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0.7";
 
-    if (isCN) {
-      // China: use first mirror as default, allow right-click cycling
-      btn.href = MIRRORS[0] + directUrl;
-      setupMirrorFallback(btn, directUrl);
-    } else {
-      btn.href = directUrl;
-    }
+    const { url, results } = await pickFastestDownload(tag);
 
-    // Update version display text
-    const verSpan = document.querySelector('.game-card-container span[style*="版本"]');
+    btn.href = url;
+    btn.innerHTML = originalHTML;
+    btn.style.pointerEvents = "";
+    btn.style.opacity = "";
+    btn.title =
+      "Fastest: " +
+      results
+        .slice(0, 3)
+        .map((r) => `${r.name} (${r.ms.toFixed(0)}ms)`)
+        .join(" | ");
+
+    const verSpan = document.querySelector(
+      '.game-card-container span[style*="版本"]'
+    );
     const text = `版本: ${tag} | 大小: 约 104MB`;
     if (verSpan) {
       verSpan.textContent = text;
@@ -88,7 +110,9 @@ async function updateDownloadLink() {
       }
     }
   } catch (e) {
-    // Keep default link on failure
+    btn.innerHTML = originalHTML;
+    btn.style.pointerEvents = "";
+    btn.style.opacity = "";
   }
 }
 
@@ -108,8 +132,13 @@ export function initLeaderboard() {
   }
 
   function renderLeaderboard(data) {
-    if (!data || !data.leaderboard || data.leaderboard.length === 0) {
-      lbContent.innerHTML = '<div class="leaderboard-empty">No records yet. Download and claim the top spot!</div>';
+    if (
+      !data ||
+      !data.leaderboard ||
+      data.leaderboard.length === 0
+    ) {
+      lbContent.innerHTML =
+        '<div class="leaderboard-empty">No records yet. Download and claim the top spot!</div>';
       lbStats.style.display = "none";
       return;
     }
@@ -136,18 +165,24 @@ export function initLeaderboard() {
   function renderStats(data) {
     if (data && data.status === "success" && data.data) {
       lbPlayerCount.innerText = data.data.player_count.toLocaleString();
-      lbHighestScore.innerText = Number(data.data.highest_score).toLocaleString();
+      lbHighestScore.innerText = Number(
+        data.data.highest_score
+      ).toLocaleString();
       lbStats.style.display = "flex";
     } else if (data && data.total_players !== undefined) {
       lbPlayerCount.innerText = data.total_players.toLocaleString();
-      lbHighestScore.innerText = Number(data.highest_score).toLocaleString();
+      lbHighestScore.innerText = Number(
+        data.highest_score
+      ).toLocaleString();
       lbStats.style.display = "flex";
     }
   }
 
   async function fetchLeaderboard() {
     try {
-      const resp = await fetch(`${SERVER_URL}/api/leaderboard?limit=10`);
+      const resp = await fetch(
+        `${SERVER_URL}/api/leaderboard?limit=10`
+      );
       const data = await resp.json();
       if (data.status === "success") {
         renderLeaderboard(data);
@@ -155,7 +190,8 @@ export function initLeaderboard() {
       }
     } catch (e) {
       console.error("Leaderboard fetch failed:", e);
-      lbContent.innerHTML = '<div class="leaderboard-empty" style="color: #ef4444;">Could not connect to server. Please try again later.</div>';
+      lbContent.innerHTML =
+        '<div class="leaderboard-empty" style="color: #ef4444;">Could not connect to server. Please try again later.</div>';
     }
 
     try {
@@ -167,7 +203,8 @@ export function initLeaderboard() {
 
   if (lbRefreshBtn) {
     lbRefreshBtn.addEventListener("click", () => {
-      lbContent.innerHTML = '<div class="leaderboard-empty">Fetching latest data...</div>';
+      lbContent.innerHTML =
+        '<div class="leaderboard-empty">Fetching latest data...</div>';
       fetchLeaderboard();
     });
   }
@@ -175,7 +212,7 @@ export function initLeaderboard() {
   fetchLeaderboard();
   pollInterval = setInterval(fetchLeaderboard, 30000);
 
-  window.addEventListener('beforeunload', () => {
+  window.addEventListener("beforeunload", () => {
     if (pollInterval) clearInterval(pollInterval);
   });
 }
