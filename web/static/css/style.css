@@ -1666,15 +1666,15 @@ body.light-mode .replay-btn {
 
 .about-footer {
     text-align: center;
-    padding: 32px 20px 40px;
+    padding: 32px 40px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 18px;
 }
 
 .about-intro {
     font-size: 13px;
-    line-height: 1.9;
+    line-height: 2.2;
     color: var(--text-muted);
     max-width: 620px;
     margin: 0 auto;
@@ -1686,5 +1686,5 @@ body.light-mode .replay-btn {
     letter-spacing: 1px;
     color: var(--text-muted);
     opacity: 0.5;
-    margin-top: 8px;
+    margin-top: 12px;
 }
