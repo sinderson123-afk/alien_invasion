@@ -1,0 +1,1650 @@
+/* ==========================================
+   1. 核心设计系统与色彩变量
+   ========================================== */
+:root {
+    /* 深色主题变量 (默认) */
+    --bg-gradient: radial-gradient(circle at 0% 0%, #0b0f19 0%, #030712 100%);
+    --card-bg: rgba(15, 23, 42, 0.45);
+    --card-border: rgba(255, 255, 255, 0.07);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-color: linear-gradient(135deg, #6366f1, #a855f7);
+    --accent-solid: #6366f1;
+    --accent-solid-hover: #4f46e5;
+    --accent-glow: rgba(99, 102, 241, 0.3);
+    --hover-bg: rgba(255, 255, 255, 0.05);
+    --active-day-bg: rgba(99, 102, 241, 0.2);
+    --today-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(168, 85, 247, 0.35));
+    --input-bg: rgba(15, 23, 42, 0.6);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+    --shadow-premium: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+    --glass-blur: blur(25px);
+}
+
+body.light-mode {
+    /* 浅色主题变量 */
+    --bg-gradient: radial-gradient(circle at 0% 0%, #f8fafc 0%, #e2e8f0 100%);
+    --card-bg: rgba(255, 255, 255, 0.45);
+    --card-border: rgba(0, 0, 0, 0.07);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent-color: linear-gradient(135deg, #4f46e5, #7c3aed);
+    --accent-solid: #4f46e5;
+    --accent-solid-hover: #4338ca;
+    --accent-glow: rgba(79, 70, 229, 0.15);
+    --hover-bg: rgba(0, 0, 0, 0.04);
+    --active-day-bg: rgba(79, 70, 229, 0.12);
+    --today-bg: linear-gradient(135deg, rgba(79, 70, 229, 0.22), rgba(124, 58, 237, 0.22));
+    --input-bg: rgba(255, 255, 255, 0.7);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --shadow-premium: 0 20px 50px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ==========================================
+   2. 基础页面排版与自适应滚动
+   ========================================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-primary);
+    overflow-x: hidden;
+    position: relative;
+    padding: 20px;
+    transition: color 0.5s ease;
+}
+
+/* 统一过渡动效 */
+body, .glass-card, button, input, textarea, span, p, div {
+    transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ==========================================
+   3. 动态流体渐变背景 (Blobs Animation)
+   ========================================== */
+.background-glow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    overflow: hidden;
+    background: var(--bg-gradient);
+    transition: background 0.5s ease;
+}
+
+.blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.38;
+    animation: float 25s infinite alternate ease-in-out;
+    pointer-events: none;
+}
+
+.blob-1 {
+    width: 550px;
+    height: 550px;
+    background: rgba(99, 102, 241, 0.45); /* Indigo */
+    top: -10%;
+    left: -10%;
+    animation-duration: 25s;
+}
+
+body.light-mode .blob-1 {
+    background: rgba(129, 140, 248, 0.3);
+}
+
+.blob-2 {
+    width: 650px;
+    height: 650px;
+    background: rgba(168, 85, 247, 0.35); /* Purple */
+    bottom: -15%;
+    right: -10%;
+    animation-duration: 32s;
+}
+
+body.light-mode .blob-2 {
+    background: rgba(192, 132, 252, 0.25);
+}
+
+.blob-3 {
+    width: 450px;
+    height: 450px;
+    background: rgba(20, 184, 166, 0.28); /* Teal */
+    top: 40%;
+    left: 45%;
+    animation-duration: 20s;
+}
+
+body.light-mode .blob-3 {
+    background: rgba(45, 212, 191, 0.2);
+}
+
+@keyframes float {
+    0% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(80px, -50px) scale(1.15); }
+    100% { transform: translate(-40px, 60px) scale(0.9); }
+}
+
+/* ==========================================
+   4. 主卡片玻璃拟态容器
+   ========================================== */
+.dashboard-container {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 1;
+    animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 顶部导航区 */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+}
+
+.brand-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: var(--accent-color);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brand-title svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--accent-solid);
+}
+
+/* 主体双栏网格 */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 24px;
+}
+
+@media (max-width: 820px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 玻璃卡片基类 */
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 30px;
+    box-shadow: var(--shadow-premium);
+}
+
+/* ==========================================
+   5. 左栏组件：时间、天气
+   ========================================== */
+.info-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 24px;
+}
+
+/* 实时时钟 */
+.clock-widget {
+    display: flex;
+    flex-direction: column;
+}
+
+.live-clock {
+    font-family: 'Outfit', sans-serif;
+    font-size: 56px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -1px;
+    color: var(--text-primary);
+    text-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.time-greeting {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.full-date {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+/* 天气组件 */
+.weather-widget {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+body.light-mode .weather-widget {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.weather-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 1;
+}
+
+.weather-location {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.weather-location:hover {
+    color: var(--accent-solid);
+}
+
+.weather-location svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.weather-temp-text {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-primary);
+}
+
+.weather-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.weather-visual {
+    width: 70px;
+    height: 70px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 城市搜索浮层 */
+.city-search-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    transform: translateY(101%);
+    transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 2;
+}
+
+.city-search-overlay.active {
+    transform: translateY(0);
+}
+
+.city-input {
+    flex: 1;
+    background: var(--input-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+}
+
+.city-btn {
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.city-btn:hover {
+    opacity: 0.9;
+}
+
+.city-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+/* ==========================================
+   6. 右栏组件：互动月历与备忘录
+   ========================================== */
+.calendar-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* 日历控制头 */
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.calendar-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.calendar-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+body.light-mode .nav-btn {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.nav-btn:hover {
+    background: var(--hover-bg);
+    color: var(--accent-solid);
+    transform: scale(1.05);
+}
+
+.nav-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+/* 星期表头 */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+/* 日期网格 */
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    text-align: center;
+}
+
+.day-cell {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+}
+
+.day-cell:hover:not(.empty) {
+    background: var(--hover-bg);
+    transform: translateY(-1px);
+}
+
+.day-cell.empty {
+    cursor: default;
+}
+
+.day-cell.today {
+    background: var(--today-bg);
+    font-weight: 700;
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+    color: var(--text-primary);
+}
+
+.day-cell.selected {
+    background: var(--active-day-bg);
+    border: 1.5px solid var(--accent-solid);
+    box-shadow: 0 0 12px var(--accent-glow);
+    font-weight: 600;
+}
+
+/* 便签提示小圆点 */
+.memo-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-solid);
+    position: absolute;
+    bottom: 6px;
+    box-shadow: 0 0 4px var(--accent-glow);
+}
+
+/* ==========================================
+   7. 备忘便签编辑区
+   ========================================== */
+.memo-widget {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+body.light-mode .memo-widget {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.memo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.memo-date-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.memo-textarea {
+    width: 100%;
+    height: 70px;
+    background: var(--input-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    line-height: 1.6;
+}
+
+.memo-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.memo-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.save-memo-btn {
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px var(--accent-glow);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.save-memo-btn:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+}
+
+.save-memo-btn:active {
+    transform: translateY(1px);
+}
+
+/* ==========================================
+   8. 底部心灵金句卡片
+   ========================================== */
+.footer-quote-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 30px;
+}
+
+.quote-content-wrapper {
+    flex: 1;
+}
+
+.quote-text {
+    font-family: 'Noto Serif SC', 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.8;
+    color: var(--text-primary);
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+/* 金句切换动画类 */
+.quote-text.transitioning {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.refresh-quote-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+body.light-mode .refresh-quote-btn {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.refresh-quote-btn:hover {
+    color: var(--accent-solid);
+    background: var(--hover-bg);
+    transform: scale(1.05);
+}
+
+.refresh-quote-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    transition: transform 0.6s ease;
+}
+
+/* 旋转动画 */
+.refresh-quote-btn.spinning svg {
+    transform: rotate(360deg);
+}
+
+/* ==========================================
+   9. 主题切换器设计
+   ========================================== */
+.theme-switch-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    box-shadow: var(--shadow-premium);
+}
+
+.theme-switch-btn:hover {
+    background: var(--hover-bg);
+    transform: scale(1.05);
+}
+
+.theme-switch-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* 暗黑/明亮图标切换显示 */
+.sun-icon { display: none; }
+.moon-icon { display: block; }
+
+body.light-mode .sun-icon { display: block; }
+body.light-mode .moon-icon { display: none; }
+
+/* ==========================================
+   10. SVG 天气图标动画
+   ========================================== */
+.weather-svg {
+    width: 60px;
+    height: 60px;
+}
+
+/* 晴天 */
+.sun-rays {
+    transform-origin: 32px 32px;
+    animation: spin 30s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 雨天 */
+.rain-drop {
+    animation: fall 1.6s infinite linear;
+}
+@keyframes fall {
+    0% { transform: translateY(0); opacity: 0; }
+    45% { opacity: 1; }
+    100% { transform: translateY(12px); opacity: 0; }
+}
+.drop-1 { animation-delay: 0s; }
+.drop-2 { animation-delay: 0.5s; }
+.drop-3 { animation-delay: 1s; }
+
+/* 雪天 */
+.snowflake {
+    animation: drift 2.4s infinite linear;
+}
+@keyframes drift {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    40% { opacity: 1; }
+    100% { transform: translateY(10px) translateX(3px); opacity: 0; }
+}
+.snow-1 { animation-delay: 0s; }
+.snow-2 { animation-delay: 0.8s; }
+.snow-3 { animation-delay: 1.6s; }
+
+/* 闪烁感应器（加载中） */
+.sensor-pulse {
+    transform-origin: 32px 32px;
+    animation: pulse 2s infinite ease-in-out;
+}
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 0.3; }
+}
+
+/* ==========================================
+   12. 效率工具箱 (计算器 & 计时器) 样式
+   ========================================== */
+.tools-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 820px) {
+    .tools-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tool-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    min-height: 410px;
+}
+
+.tool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tool-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+/* 科学计算器样式 */
+.calc-screen {
+    background: var(--input-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    height: 76px;
+    font-family: 'Outfit', sans-serif;
+    overflow: hidden;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+}
+
+body.light-mode .calc-screen {
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.calc-formula {
+    font-size: 13px;
+    color: var(--text-muted);
+    min-height: 16px;
+    letter-spacing: 0.5px;
+    width: 100%;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calc-result {
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 2px;
+    line-height: 1.1;
+    width: 100%;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.calc-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    flex: 1;
+}
+
+.calc-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    aspect-ratio: 1.45;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: 'Outfit', sans-serif;
+}
+
+body.light-mode .calc-btn {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.calc-btn:hover {
+    background: var(--hover-bg);
+    transform: scale(1.03);
+}
+
+.calc-btn:active {
+    transform: scale(0.96);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.light-mode .calc-btn:active {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+/* 科学运算按钮 */
+.sci-btn {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: 'Inter', sans-serif;
+}
+
+body.light-mode .sci-btn {
+    background: rgba(0, 0, 0, 0.015);
+}
+
+/* 运算符按钮 */
+.op-btn {
+    color: var(--accent-solid);
+    font-weight: 600;
+}
+
+.equal-btn {
+    background: var(--accent-color);
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px var(--accent-glow);
+    border: none;
+}
+
+.equal-btn:hover {
+    opacity: 0.95;
+    box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+/* 计时器样式 */
+.timer-tabs {
+    display: flex;
+    background: var(--input-bg);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+}
+
+.timer-tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.timer-tab-btn.active {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.timer-panel {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 16px;
+}
+
+.timer-panel.active {
+    display: flex;
+}
+
+/* 番茄钟环形进度条 */
+.pomodoro-circle-wrapper {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.pomodoro-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.p-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.04);
+    stroke-width: 4.5;
+}
+
+body.light-mode .p-track {
+    stroke: rgba(0, 0, 0, 0.03);
+}
+
+.p-progress {
+    fill: none;
+    stroke: var(--accent-solid);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    stroke-dasharray: 326.7;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.35s linear;
+}
+
+.pomodoro-time-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1;
+    pointer-events: none;
+}
+
+#p-time {
+    font-family: 'Outfit', sans-serif;
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+
+.pomodoro-state-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+/* 计时器通用控制按钮 */
+.timer-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+}
+
+.timer-control-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+}
+
+body.light-mode .timer-control-btn {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.timer-control-btn:hover {
+    background: var(--hover-bg);
+    color: var(--accent-solid);
+    transform: scale(1.06);
+}
+
+.timer-control-btn:active {
+    transform: scale(0.95);
+}
+
+.timer-control-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+/* 滑杆设置 */
+.p-settings {
+    width: 100%;
+    max-width: 200px;
+}
+
+.p-setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.p-setting-item input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 5px;
+    background: var(--input-bg);
+    outline: none;
+    border: 1px solid var(--card-border);
+}
+
+.p-setting-item input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--accent-solid);
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--accent-glow);
+    transition: transform 0.1s ease;
+}
+
+.p-setting-item input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* 秒表独占样式 */
+.stopwatch-display {
+    font-family: 'Outfit', sans-serif;
+    font-size: 38px;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sw-laps-wrapper {
+    width: 100%;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    overflow-y: auto;
+}
+
+body.light-mode .sw-laps-wrapper {
+    background: rgba(0, 0, 0, 0.015);
+}
+
+/* 自定义微型滚动条 */
+.sw-laps-wrapper::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sw-laps-wrapper::-webkit-scrollbar-track {
+    background: none;
+}
+
+.sw-laps-wrapper::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+}
+
+.sw-laps-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sw-lap-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: 'Outfit', sans-serif;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+    padding-bottom: 4px;
+}
+
+body.light-mode .sw-lap-item {
+    border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+.sw-lap-item span.lap-index {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.sw-lap-item span.lap-time {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* ==========================================
+   13. 访问分析组件样式
+   ========================================== */
+.visit-analytics-widget {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: auto; /* 自动推到最底部 */
+}
+
+body.light-mode .visit-analytics-widget {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.analytics-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.analytics-count {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--hover-bg);
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+}
+
+.analytics-today {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.analytics-today span.accent-text {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    background: var(--accent-color);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* 柱状图样式 */
+.analytics-chart {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: 60px;
+    padding-top: 15px;
+    border-top: 1px dashed var(--card-border);
+}
+
+.chart-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.chart-bar {
+    width: 14px;
+    background: var(--accent-color);
+    border-radius: 4px 4px 0 0;
+    height: 0; /* JS 动态控制 */
+    transition: height 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    cursor: pointer;
+}
+
+.chart-bar:hover::after {
+    content: attr(data-count) "次";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translate(-50%, -4px);
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-size: 10px;
+    font-family: 'Outfit', sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+body.light-mode .chart-bar:hover::after {
+    background: rgba(255,255,255,0.9);
+    color: #000;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.chart-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    transform: scale(0.9);
+}
+
+/* ==========================================
+   14. Alien Invasion 端游下载 & 排行榜样式
+   ========================================== */
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-color);
+    color: #fff;
+    text-decoration: none;
+    padding: 12px 28px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    box-shadow: 0 8px 20px var(--accent-glow);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.download-btn:hover {
+    transform: translateY(-2px);
+    opacity: 0.95;
+    box-shadow: 0 10px 25px var(--accent-glow);
+}
+
+.download-btn:active {
+    transform: translateY(1px);
+}
+
+.leaderboard-panel {
+    margin-top: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 16px 20px;
+}
+
+body.light-mode .leaderboard-panel {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.leaderboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.leaderboard-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.leaderboard-refresh {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--card-border);
+    padding: 3px 10px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.leaderboard-refresh:hover {
+    color: var(--accent-solid);
+    border-color: var(--accent-solid);
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Outfit', sans-serif;
+}
+
+.leaderboard-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.leaderboard-table td {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 7px 8px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+}
+
+body.light-mode .leaderboard-table td {
+    border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+.leaderboard-table tr:hover td {
+    background: var(--hover-bg);
+}
+
+.lb-rank { font-weight: 700; color: var(--text-primary); width: 32px; }
+.lb-rank.top1 { color: #f59e0b; }
+.lb-rank.top2 { color: #94a3b8; }
+.lb-rank.top3 { color: #d97706; }
+
+.lb-name { font-weight: 500; color: var(--text-primary); }
+.lb-score { font-weight: 600; background: var(--accent-color); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.lb-level { font-size: 11px; color: var(--text-muted); }
+.leaderboard-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0; }
+.leaderboard-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.leaderboard-stats span { font-weight: 600; color: var(--text-secondary); }
+
+/* ==========================================
+   11. 旅人的信笺游戏样式
+   ========================================== */
+.game-card-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    padding: 24px 30px;
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.game-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+.game-title span {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 6px;
+}
+
+.game-status {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--hover-bg);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+}
+
+.canvas-wrapper {
+    position: relative;
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.4) 100%);
+}
+
+body.light-mode .canvas-wrapper {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.5) 100%);
+}
+
+#game-canvas {
+    display: block;
+    width: 100%;
+    height: 180px;
+    cursor: pointer;
+}
+
+.game-instruction-overlay {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    padding: 6px 14px;
+    border-radius: 30px;
+    font-size: 12px;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    z-index: 10;
+}
+
+.game-instruction-overlay.fade-out {
+    opacity: 0;
+}
+
+.jump-key-hint {
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    padding: 1px 5px;
+    background: rgba(255, 255, 255, 0.1);
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* 字母揭晓看板 */
+.quote-reveal-board {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 40px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--card-border);
+    padding: 12px;
+    border-radius: 16px;
+}
+
+body.light-mode .quote-reveal-board {
+    background: rgba(0, 0, 0, 0.01);
+}
+
+.char-box {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px dashed var(--text-muted);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: all 0.5s ease;
+    font-family: 'Noto Serif SC', serif;
+}
+
+.char-box.revealed {
+    border-style: solid;
+    border-color: var(--accent-solid);
+    background: var(--active-day-bg);
+    color: var(--text-primary);
+    box-shadow: 0 0 8px var(--accent-glow);
+    transform: scale(1.05);
+}
+
+/* 游戏结算弹窗 (玻璃拟态 Modal Overlay) */
+.game-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    z-index: 20;
+    border-radius: 24px;
+}
+
+body.light-mode .game-modal {
+    background: rgba(255, 255, 255, 0.75);
+}
+
+.game-modal.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.game-modal-content {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 24px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: var(--shadow-premium);
+    transform: translateY(20px);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.game-modal.active .game-modal-content {
+    transform: translateY(0);
+}
+
+.envelope-art {
+    margin-bottom: 12px;
+}
+
+.envelope-svg {
+    width: 50px;
+    height: 50px;
+    animation: mail-bounce 2s infinite ease-in-out;
+}
+
+@keyframes mail-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.game-modal-content h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.final-quote-text {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+}
+
+body.light-mode .final-quote-text {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.modal-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.write-btn {
+    background: var(--accent-color);
+    color: #fff;
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.replay-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+}
+
+body.light-mode .replay-btn {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.modal-btn:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+}
+
+.modal-btn:active {
+    transform: translateY(1px);
+}
