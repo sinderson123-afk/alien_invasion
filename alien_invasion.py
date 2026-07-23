@@ -109,8 +109,8 @@ class AlienInvasion:
         self._font_title_bell = pygame.font.SysFont(None, 36, bold=True)
         self._font_row_bell = pygame.font.SysFont(None, 20)
 
-        # Start background music
-        self.sound.play_bgm()
+        # Start background music (menu theme)
+        self.sound.play_menu_bgm()
 
         # Background update check (non-blocking)
         if not IS_DEV_BUILD:
@@ -252,6 +252,11 @@ class AlienInvasion:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self._quit_game()
+
+            # Menu theme track ended → play next
+            if event.type == self.sound.MUSIC_END_EVENT:
+                self.sound._advance_menu_theme()
+                continue
 
             # LOGIN state: events handled by login overlay
             if self.state == GameState.LOGIN and self.login_overlay:
@@ -409,6 +414,7 @@ class AlienInvasion:
         # Switch to game state
         self.state = GameState.PLAYING
         self.sound.set_bgm_volume(self.settings.bgm_volume)
+        self.sound.play_level_bgm(self.stats.level)
 
     def _return_to_menu(self):
         """Return to main menu: save data, clean entities, switch state"""
@@ -429,6 +435,7 @@ class AlienInvasion:
         self.death_position = None
         self.state = GameState.MENU
         self.sound.set_bgm_volume(self.settings.bgm_volume)
+        self.sound.play_menu_bgm()
 
     # ------------------------------------------------------------------
     # Save system
@@ -801,6 +808,7 @@ class AlienInvasion:
         # Switch to game state
         self.state = GameState.PLAYING
         self.sound.set_bgm_volume(self.settings.bgm_volume)
+        self.sound.play_level_bgm(self.stats.level)
 
     def _check_keydown_events(self, event):
         """Handle key press (routed by current state)"""
@@ -1378,11 +1386,13 @@ class AlienInvasion:
                 self.boss_bullets.empty()
                 self._create_fleet()
                 self.settings.increase_speed()
+                self._maybe_switch_level_bgm()
         elif not self.aliens:
             # Normal level: all aliens dead clears level
             self.bullets.empty()
             self._create_fleet()
             self.settings.increase_speed()
+            self._maybe_switch_level_bgm()
 
 
     def _fire_bullet(self):
@@ -1677,6 +1687,10 @@ class AlienInvasion:
         """Return active scrolling bg by level (earth:1-10, moon:11-20, space:21-30, cycles every 30)"""
         idx = ((self.stats.level - 1) // 10) % 3
         return self.bg_instances[idx]
+
+    def _maybe_switch_level_bgm(self):
+        """Switch BGM if the level band changed."""
+        self.sound.play_level_bgm(self.stats.level)
 
     def _draw_game_scene(self):
         """Draw all game entities (excluding pause/menu overlays)"""
