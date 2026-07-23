@@ -16,6 +16,7 @@ from game_stats import GameStats, GameState
 from scoreboard import Scoreboard
 from sound import SoundManager
 from boss import Boss
+from boss_bullet import BossBullet
 from coin import Coin
 from scrolling_background import ScrollingBackground
 from video_background import VideoBackground
