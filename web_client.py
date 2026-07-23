@@ -28,6 +28,15 @@ _TIMEOUT = 8
 
 _REPO_OWNER = "sinderson123-afk"
 _REPO_NAME = "alien_invasion"
+_PAGES_ORIGIN = "https://logan-ai.org"
+
+_GITHUB_RELEASE_BASE = f"https://github.com/{_REPO_OWNER}/{_REPO_NAME}/releases/download"
+
+_MIRROR_POOL = [
+    "https://gh.llkk.cc/",
+    "https://github.akams.cn/",
+    "https://gh-proxy.com/",
+]
 
 
 def _compare_versions(current: str, latest: str) -> bool:
@@ -160,10 +169,37 @@ class WebClient:
         return self._get(f'/api/leaderboard?limit={limit}')
 
     # ------------------------------------------------------------------
-    # Update check
+    # Update check (version.json on Cloudflare Pages → GitHub API fallback)
     # ------------------------------------------------------------------
     def check_update(self, current_version: str):
-        """Check GitHub for a newer release. Returns (new_version, html_url) or (None, None)."""
+        """Check for newer version. Returns (new_version, release_url) or (None, None).
+        Primary: Cloudflare Pages version.json (fast, works in China).
+        Fallback: GitHub API /releases/latest."""
+        tag, url = self._check_from_pages(current_version)
+        if tag:
+            return tag, url
+
+        tag, url = self._check_from_github(current_version)
+        if tag:
+            return tag, url
+        return None, None
+
+    def _check_from_pages(self, current_version: str):
+        url = f"{_PAGES_ORIGIN}/version.json"
+        try:
+            req = Request(url)
+            with urlopen(req, timeout=_TIMEOUT) as resp:
+                data = json.loads(resp.read().decode())
+            tag = data.get('latest', '')
+            if tag and _compare_versions(current_version, tag):
+                release_url = (f"https://github.com/{_REPO_OWNER}/{_REPO_NAME}"
+                               f"/releases/tag/{tag}")
+                return tag, release_url
+        except (URLError, HTTPError, OSError, json.JSONDecodeError, ValueError):
+            pass
+        return None, None
+
+    def _check_from_github(self, current_version: str):
         url = (f"https://api.github.com/repos/{_REPO_OWNER}/{_REPO_NAME}"
                "/releases/latest")
         try:
@@ -176,6 +212,14 @@ class WebClient:
         except (URLError, HTTPError, OSError, json.JSONDecodeError, ValueError):
             pass
         return None, None
+
+    @staticmethod
+    def get_download_urls(tag: str):
+        """Return (direct_url, mirror_urls) for a release tag.
+        Mirrors are for users behind China's GFW."""
+        direct = f"{_GITHUB_RELEASE_BASE}/{tag}/AlienInvasion.exe"
+        mirrors = [f"{m}{direct}" for m in _MIRROR_POOL]
+        return direct, mirrors
 
     @staticmethod
     def open_release_page(url: str):

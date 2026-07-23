@@ -1,6 +1,99 @@
 const SERVER_URL = "https://alien-invasion-1018096304579.asia-east1.run.app";
 let pollInterval = null;
 
+const MIRRORS = [
+  "https://gh.llkk.cc/",
+  "https://github.akams.cn/",
+  "https://gh-proxy.com/",
+];
+
+const GITHUB_RELEASE_BASE =
+  "https://github.com/sinderson123-afk/alien_invasion/releases/download";
+
+// ─── Geo-IP detection ────────────────────────────────────────
+
+async function isChinaIP() {
+  try {
+    const resp = await fetch("https://api.ip.sb/geoip", { signal: AbortSignal.timeout(3000) });
+    const data = await resp.json();
+    return data.country_code === "CN";
+  } catch {
+    return false;
+  }
+}
+
+// ─── Mirror fallback download ────────────────────────────────
+
+function setupMirrorFallback(btn, directUrl) {
+  const mirroredUrls = MIRRORS.map(m => m + directUrl);
+  const allUrls = [directUrl, ...mirroredUrls];
+  let mirrorIdx = -1;
+
+  btn.addEventListener("click", async (e) => {
+    // First click goes to direct; if it fails (user comes back),
+    // try mirrors sequentially
+    if (mirrorIdx < 0) {
+      mirrorIdx = 0;
+      btn.href = allUrls[0];
+    }
+  });
+
+  // Double-click or right-click to cycle mirrors
+  btn.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    mirrorIdx = (mirrorIdx + 1) % allUrls.length;
+    btn.href = allUrls[mirrorIdx];
+    btn.title = `Mirror ${mirrorIdx + 1}/${allUrls.length}`;
+    return false;
+  });
+
+  btn.title = "Right-click to switch mirror";
+}
+
+// ─── Dynamic download link ───────────────────────────────────
+
+async function updateDownloadLink() {
+  const btn = document.querySelector(".download-btn");
+  if (!btn) return;
+
+  try {
+    // Fetch version from Cloudflare Pages (fast, cached globally)
+    const vResp = await fetch("/version.json");
+    const verData = await vResp.json();
+    const tag = verData.latest;
+    const directUrl = `${GITHUB_RELEASE_BASE}/${tag}/AlienInvasion.exe`;
+
+    const isCN = await isChinaIP();
+
+    if (isCN) {
+      // China: use first mirror as default, allow right-click cycling
+      btn.href = MIRRORS[0] + directUrl;
+      setupMirrorFallback(btn, directUrl);
+    } else {
+      btn.href = directUrl;
+    }
+
+    // Update version display text
+    const verSpan = document.querySelector('.game-card-container span[style*="版本"]');
+    const text = `版本: ${tag} | 大小: 约 104MB`;
+    if (verSpan) {
+      verSpan.textContent = text;
+    } else {
+      const spans = document.querySelectorAll(".game-card-container span");
+      for (const s of spans) {
+        if (s.textContent && s.textContent.startsWith("版本")) {
+          s.textContent = text;
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    // Keep default link on failure
+  }
+}
+
+// ─── Leaderboard ─────────────────────────────────────────────
+
 export function initLeaderboard() {
   const lbContent = document.getElementById("leaderboard-content");
   const lbStats = document.getElementById("leaderboard-stats");
@@ -16,14 +109,14 @@ export function initLeaderboard() {
 
   function renderLeaderboard(data) {
     if (!data || !data.leaderboard || data.leaderboard.length === 0) {
-      lbContent.innerHTML = '<div class="leaderboard-empty">还没有人留下足迹，快去下载游戏打个榜首吧！</div>';
+      lbContent.innerHTML = '<div class="leaderboard-empty">No records yet. Download and claim the top spot!</div>';
       lbStats.style.display = "none";
       return;
     }
 
     const rankClasses = { 1: "top1", 2: "top2", 3: "top3" };
     let html = `<table class="leaderboard-table">
-      <thead><tr><th>#</th><th>玩家</th><th>分数</th><th>关卡</th></tr></thead><tbody>`;
+      <thead><tr><th>#</th><th>Player</th><th>Score</th><th>Level</th></tr></thead><tbody>`;
     data.leaderboard.forEach((entry, idx) => {
       const rank = idx + 1;
       const rankCls = rankClasses[rank] || "";
@@ -61,8 +154,8 @@ export function initLeaderboard() {
         renderStats(data);
       }
     } catch (e) {
-      console.error("云端通信失败:", e);
-      lbContent.innerHTML = '<div class="leaderboard-empty" style="color: #ef4444;">连接云端服务器失败，请稍后再试。</div>';
+      console.error("Leaderboard fetch failed:", e);
+      lbContent.innerHTML = '<div class="leaderboard-empty" style="color: #ef4444;">Could not connect to server. Please try again later.</div>';
     }
 
     try {
@@ -74,7 +167,7 @@ export function initLeaderboard() {
 
   if (lbRefreshBtn) {
     lbRefreshBtn.addEventListener("click", () => {
-      lbContent.innerHTML = '<div class="leaderboard-empty">正在向云端拉取最新数据...</div>';
+      lbContent.innerHTML = '<div class="leaderboard-empty">Fetching latest data...</div>';
       fetchLeaderboard();
     });
   }
@@ -91,30 +184,6 @@ export function cleanupLeaderboard() {
   if (pollInterval) clearInterval(pollInterval);
 }
 
-async function updateDownloadLink() {
-  try {
-    const resp = await fetch('https://api.github.com/repos/sinderson123-afk/alien_invasion/releases/latest');
-    const data = await resp.json();
-    const exeAsset = data.assets.find(a => a.name.endsWith('.exe'));
-    if (exeAsset) {
-      const link = document.querySelector('.download-btn');
-      if (link) link.href = exeAsset.browser_download_url;
-      const verSpan = document.querySelector('.game-card-container span[style*="版本"]');
-      if (!verSpan) {
-        const spans = document.querySelectorAll('.game-card-container span');
-        for (const s of spans) {
-          if (s.textContent && s.textContent.includes('版本')) {
-            s.textContent = `版本: ${data.tag_name} | 大小: 约 104MB`;
-            break;
-          }
-        }
-      } else {
-        verSpan.textContent = `版本: ${data.tag_name} | 大小: 约 104MB`;
-      }
-    }
-  } catch (e) {
-    /* keep default link */
-  }
-}
+// ─── Init on load ────────────────────────────────────────────
 
 updateDownloadLink();
