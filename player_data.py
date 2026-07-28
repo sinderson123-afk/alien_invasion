@@ -9,7 +9,7 @@ from file_crypto import encrypt_json, decrypt_json
 _DEFAULTS = {
     'coins': 0,
     'items': {'magnet': 0, 'shield': 0, 'clover': 0},
-    'skills': {'speed': 0, 'ammo': 0, 'vitality': 0},
+    'skills': {'speed': 0, 'ammo': 0, 'vitality': 0, 'damage': 0},
     'armor': None,
     'token': '',
     'username': '',

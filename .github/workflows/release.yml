@@ -18,6 +18,8 @@ jobs:
   build-dev:
     if: github.ref_type != 'tag'
     runs-on: windows-latest
+    env:
+      OPENBLAS_NUM_THREADS: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,6 +82,8 @@ jobs:
   build-dev-mac:
     if: github.ref_type != 'tag'
     runs-on: macos-14
+    env:
+      OPENBLAS_NUM_THREADS: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -140,6 +144,8 @@ jobs:
   build-release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    env:
+      OPENBLAS_NUM_THREADS: 1
     permissions:
       contents: write
     steps:
@@ -191,6 +197,8 @@ jobs:
   build-mac:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-14
+    env:
+      OPENBLAS_NUM_THREADS: 1
     permissions:
       contents: write
     steps:

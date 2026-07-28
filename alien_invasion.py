@@ -39,6 +39,7 @@ class AlienInvasion:
         self.clock = pygame.time.Clock()
         self.settings = Settings()
         self.screen = pygame.display.set_mode((self.settings.screen_width, self.settings.screen_height))
+        self.screen_rect = self.screen.get_rect()
         pygame.display.set_caption("Alien Invasion")
 
         self.stats = GameStats(self)
@@ -103,6 +104,12 @@ class AlienInvasion:
         self.clover_flash_frames = 0       # Clover screen flash countdown
         self.clover_push_frames = 0        # Clover push animation countdown
         self._update_available = None      # (version, url) when update found
+        self.in_transition = False         # Level transition cinematic active
+        self.transition_stage = ''         # 'rise', 'hover', 'exit', 'enter'
+        self.transition_frames = 0         # Remaining frames in current stage
+        self.transition_level_text = ''    # "Entering Earth Orbit" etc.
+        self.transition_blackout = 0       # Fade-to-black alpha (0.0-1.0)
+        self._last_bg_instance = None      # Previous bg instance for zone-change detection
 
         # Bell notification fonts
         self._font_small_bell = pygame.font.SysFont(None, 14)
@@ -134,8 +141,11 @@ class AlienInvasion:
                 if self.clover_flash_frames > 0:
                     self.clover_flash_frames -= 1
 
-                # Fail animation (highest priority, freezes all other updates)
-                if self.game_over_frames > 0:
+                # Level transition cinematic (freezes all gameplay)
+                if self.in_transition:
+                    self._update_transition()
+                    self.particles.update()
+                elif self.game_over_frames > 0:
                     self.game_over_frames -= 1
                     self.particles.update()
                     if self.game_over_frames == 0:
@@ -364,6 +374,10 @@ class AlienInvasion:
             s.ship_speed = s.ship_speed_max
         s.bullet_allowed = 3 + skills['ammo']
         # vitality (max HP) already handled in GameStats.reset_stats
+        # damage boost: +20% per level
+        dmg_mult = 1 + skills.get('damage', 0) * 0.2
+        s.bullet_damage = round(s.bullet_damage_base * dmg_mult, 2)
+        s.missile_damage = round(s.missile_damage_base * dmg_mult, 2)
 
     def _quit_game(self):
         """Save high score and player data, then quit"""
@@ -410,6 +424,10 @@ class AlienInvasion:
         # Create fleet, position ship
         self._create_fleet()
         self.ship.center_ship()
+        self._last_bg_instance = self._active_bg()
+        self.in_transition = False
+        self.transition_stage = ''
+        self.transition_blackout = 0
 
         # Switch to game state
         self.state = GameState.PLAYING
@@ -433,6 +451,9 @@ class AlienInvasion:
         self.ship_death_frames = 0
         self.game_over_frames = 0
         self.death_position = None
+        self.in_transition = False
+        self.transition_stage = ''
+        self.transition_blackout = 0
         self.state = GameState.MENU
         self.sound.set_bgm_volume(self.settings.bgm_volume)
         self.sound.play_menu_bgm()
@@ -452,7 +473,7 @@ class AlienInvasion:
                 flashing_alien_id = None
 
         data = {
-            'version': 3,  # Save format version
+            'version': 4,  # Save format version
             'stats': {
                 'score': self.stats.score,
                 'kills': self.stats.kills,
@@ -471,6 +492,8 @@ class AlienInvasion:
                 'bullet_speed': self.settings.bullet_speed,
                 'alien_speed': self.settings.alien_speed,
                 'bullet_allowed': self.settings.bullet_allowed,
+                'bullet_damage': self.settings.bullet_damage,
+                'missile_damage': self.settings.missile_damage,
             },
             'ship': {
                 'x': self.ship.x,
@@ -604,7 +627,14 @@ class AlienInvasion:
                 del s['ship_left']
             data.setdefault('version', 3)
             save_ver = 3
-        # future v3 -> v4 appended here
+        if save_ver < 4:
+            # v3 -> v4: store bullet_damage / missile_damage in settings
+            ss = data.setdefault('settings', {})
+            ss.setdefault('bullet_damage', 1)
+            ss.setdefault('missile_damage', 5)
+            data.setdefault('version', 4)
+            save_ver = 4
+        # future v4 -> v5 appended here
         return data
 
     def _resume_game(self):
@@ -635,6 +665,10 @@ class AlienInvasion:
         self.settings.bullet_speed = ss['bullet_speed']
         self.settings.alien_speed = min(ss['alien_speed'], self.settings.alien_speed_max)
         self.settings.bullet_allowed = ss['bullet_allowed']
+        self.settings.bullet_damage = ss.get('bullet_damage',
+                                             self.settings.bullet_damage_base)
+        self.settings.missile_damage = ss.get('missile_damage',
+                                              self.settings.missile_damage_base)
 
         # --- Restore ship ---
         sh = data['ship']
@@ -829,8 +863,8 @@ class AlienInvasion:
 
         # -------- PLAYING state --------
         elif self.state == GameState.PLAYING:
-            # Disable pause and game actions during death/fail sequence
-            is_dead = self.ship_death_frames > 0 or self.game_over_frames > 0
+            # Disable pause and game actions during death/fail/transition sequence
+            is_dead = self.ship_death_frames > 0 or self.game_over_frames > 0 or self.in_transition
             if is_dead:
                 return
             if event.key == pygame.K_ESCAPE:
@@ -1073,6 +1107,127 @@ class AlienInvasion:
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         overlay.fill((80, 255, 120, alpha))
         self.screen.blit(overlay, (0, 0))
+
+    def _draw_shield(self):
+        """Draw a pulsing golden sphere shield around the ship."""
+        s = self.settings
+        pulse = math.sin(pygame.time.get_ticks() * s.shield_pulse_speed * 0.01) * 0.25 + 0.7
+        ship_center = self.ship.rect.center
+
+        alpha = int(pulse * 160)
+        surf = pygame.Surface((s.shield_outer_radius * 2 + 16, s.shield_outer_radius * 2 + 16),
+                              pygame.SRCALPHA)
+        cx, cy = surf.get_width() // 2, surf.get_height() // 2
+
+        r, g, b = s.shield_color
+        # Outer glow (thicker, brighter)
+        alpha_outer = int(pulse * 100)
+        pygame.draw.circle(surf, (r, g, b, alpha_outer), (cx, cy), s.shield_outer_radius + 6, 4)
+        pygame.draw.circle(surf, (r, g, b, alpha_outer // 2), (cx, cy), s.shield_outer_radius, 2)
+
+        # Inner shell (solid core)
+        alpha_inner = int(pulse * 140)
+        pygame.draw.circle(surf, (r, g, b, alpha_inner), (cx, cy), s.shield_inner_radius, 3)
+
+        # Core fill (subtle)
+        alpha_fill = int(pulse * 40)
+        pygame.draw.circle(surf, (r, g, b, alpha_fill), (cx, cy), s.shield_inner_radius - 4)
+
+        self.screen.blit(surf, (ship_center[0] - cx, ship_center[1] - cy))
+
+    def _draw_near_death_vignette(self):
+        """Draw a red gradient vignette at screen edges when HP is critical."""
+        alpha = self.settings.vignette_max_alpha
+        w, h = self.screen.get_size()
+        overlay = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        for i in range(8):
+            r = 200 + i * 20
+            a = alpha - i * 6
+            if a <= 0:
+                break
+            pygame.draw.rect(overlay, (160, 20, 20, a), (i * 3, i * 3, w - i * 6, h - i * 6), 3)
+
+        self.screen.blit(overlay, (0, 0))
+
+    def _draw_transition_overlay(self):
+        """Draw transition cinematic overlay with visual effects."""
+        s = self.settings
+        screen_w = self.screen_rect.width
+        screen_h = self.screen_rect.height
+        color = self._transition_zone_color
+
+        # Blackout fade (covers game scene)
+        if hasattr(self, 'transition_blackout') and self.transition_blackout > 0:
+            overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+            alpha = int(self.transition_blackout * 255)
+            overlay.fill((0, 0, 0, min(alpha, 255)))
+            self.screen.blit(overlay, (0, 0))
+
+        # Star streaks
+        for st in self._trans_streaks:
+            y1 = max(0, st['y'] - st['height'])
+            y2 = min(screen_h, st['y'])
+            streak_surf = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+            pygame.draw.line(streak_surf,
+                             (220, 230, 255, st['alpha']),
+                             (st['x'], y1), (st['x'], y2), 2)
+            self.screen.blit(streak_surf, (0, 0))
+
+        # Engine trail particles
+        for t in self._trans_trails:
+            ratio = t['life'] / t['max_life']
+            alpha = int(ratio * 200)
+            size = int(t['size'] * ratio)
+            if size < 1:
+                continue
+            trail_surf = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+            pygame.draw.circle(trail_surf, (*color, alpha),
+                               (size, size), size)
+            self.screen.blit(trail_surf,
+                             (int(t['x']) - size, int(t['y']) - size))
+
+        # Ship glow during hover
+        if self.transition_stage == 'hover':
+            glow_surf = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+            cx = self.ship.rect.centerx
+            cy = self.ship.rect.centery
+            for r in range(60, 20, -8):
+                alpha = int(15 * (1 - (r - 20) / 40))
+                if alpha <= 0:
+                    continue
+                pygame.draw.circle(glow_surf, (*color, alpha),
+                                   (int(cx), int(cy)), r)
+            self.screen.blit(glow_surf, (0, 0))
+
+        # White flash on warp entry
+        if self._transition_flash_frames > 0:
+            ratio = self._transition_flash_frames / s.transition_flash_frames
+            flash = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+            flash.fill((255, 255, 255, int(ratio * 200)))
+            self.screen.blit(flash, (0, 0))
+
+        # Zone entry text
+        if self.transition_stage in ('hover', 'exit'):
+            ratio = min(1.0, max(0, self.transition_frames / s.transition_hover_frames))
+            if self.transition_stage == 'exit':
+                ratio = 0.3
+            alpha = int(ratio * 220)
+            scale = 1.0 + (1 - ratio) * 0.15
+
+            glow_font = pygame.font.SysFont(None, int(58 * scale))
+            glow_text = glow_font.render(self.transition_level_text, True,
+                                         (*color, min(alpha, 80)))
+            glow_rect = glow_text.get_rect(
+                center=(screen_w // 2 + 2, screen_h // 2 - 80 + 2))
+            self.screen.blit(glow_text, glow_rect)
+
+            font = pygame.font.SysFont(None, int(56 * scale))
+            text_img = font.render(self.transition_level_text, True, color)
+            text_img.set_alpha(alpha)
+            text_rect = text_img.get_rect(
+                center=(screen_w // 2, screen_h // 2 - 80))
+            self.screen.blit(text_img, text_rect)
 
     def _draw_update_banner(self):
         """Draw an 'Update available' banner on the main menu."""
@@ -1384,15 +1539,17 @@ class AlienInvasion:
                 self._check_level_up()
                 self.bullets.empty()
                 self.boss_bullets.empty()
+                if self._maybe_switch_level_bgm():
+                    return
                 self._create_fleet()
                 self.settings.increase_speed()
-                self._maybe_switch_level_bgm()
         elif not self.aliens:
             # Normal level: all aliens dead clears level
             self.bullets.empty()
+            if self._maybe_switch_level_bgm():
+                return
             self._create_fleet()
             self.settings.increase_speed()
-            self._maybe_switch_level_bgm()
 
 
     def _fire_bullet(self):
@@ -1608,7 +1765,7 @@ class AlienInvasion:
         # ---- Meteor <-> Bullet ----
         for meteor in self.meteors:
             bullet_hits = pygame.sprite.spritecollide(meteor, self.bullets, True)
-            if bullet_hits and meteor.take_damage(len(bullet_hits)):
+            if bullet_hits and meteor.take_damage(s.bullet_damage * len(bullet_hits)):
                 self._meteor_break(meteor)
                 self.stats.score += s.meteor_points
                 self.sb.prep_score()
@@ -1689,8 +1846,157 @@ class AlienInvasion:
         return self.bg_instances[idx]
 
     def _maybe_switch_level_bgm(self):
-        """Switch BGM if the level band changed."""
+        """Switch BGM and trigger transition cinematic if zone changed.
+        Returns True if a transition was started."""
+        old = self._last_bg_instance
         self.sound.play_level_bgm(self.stats.level)
+        new = self._active_bg()
+        self._last_bg_instance = new
+        if old is not None and old is not new:
+            zones = ['Earth', 'Moon', 'Space']
+            idx = ((self.stats.level - 1) // 10) % 3
+            self.transition_level_text = f"Entering {zones[idx]} Orbit"
+            self._start_transition()
+            return True
+        return False
+
+    def _start_transition(self):
+        """Begin the level-transition cinematic."""
+        self.in_transition = True
+        self.transition_stage = 'rise'
+        self.transition_frames = self.settings.transition_rise_frames
+        self._transition_ship_start_y = self.ship.rect.y
+        self._transition_center_y = self.screen_rect.centery
+        self._transition_flash_frames = 0
+        self._transition_trail_timer = 0
+        self._trans_trails = []
+        self._trans_streaks = []
+        self._transition_zone_color = {
+            'Earth': (80, 200, 220),
+            'Moon': (200, 200, 210),
+            'Space': (140, 120, 240),
+        }.get(self._transition_zone_name(), (200, 220, 255))
+
+    def _transition_zone_name(self):
+        """Get the zone name for the current transition."""
+        zones = ['Earth', 'Moon', 'Space']
+        idx = ((self.stats.level - 1) // 10) % 3
+        return zones[idx]
+
+    def _update_transition(self):
+        """Advance the transition cinematic one frame."""
+        s = self.settings
+        self.transition_frames -= 1
+
+        if self.transition_stage == 'rise':
+            prog = 1.0 - self.transition_frames / s.transition_rise_frames
+            target_y = self._transition_center_y
+            self.ship.rect.y = int(self._transition_ship_start_y
+                                   + (target_y - self._transition_ship_start_y) * prog)
+            self._transition_spawn_trail()
+            self._transition_update_trails()
+            if self.transition_frames <= 0:
+                self.transition_stage = 'hover'
+                self.transition_frames = s.transition_hover_frames
+
+        elif self.transition_stage == 'hover':
+            bob = math.sin(self.transition_frames * 0.15) * 3
+            self.ship.rect.y = int(self._transition_center_y + bob)
+            self._transition_update_trails()
+            if self.transition_frames <= 0:
+                self.transition_stage = 'exit'
+                self.transition_frames = s.transition_exit_frames
+                self.ship.rect.centerx = self.screen_rect.centerx
+
+        elif self.transition_stage == 'exit':
+            self.ship.rect.y -= s.transition_ship_exit_speed
+            self.transition_blackout = 1.0 - self.transition_frames / s.transition_exit_frames
+            self._transition_spawn_trail()
+            self._transition_update_trails()
+            self._transition_spawn_streaks()
+            self._transition_update_streaks()
+            if self.transition_frames <= 0:
+                self.transition_stage = 'enter'
+                self.transition_frames = s.transition_enter_frames
+                self.ship.rect.centerx = self.screen_rect.centerx
+                self.ship.rect.bottom = self.screen_rect.height + 20
+                self.bullets.empty()
+                self.missiles.empty()
+                self.aliens.empty()
+                self.boss_bullets.empty()
+                self._transition_flash_frames = s.transition_flash_frames
+                self._trans_trails.clear()
+                self._trans_streaks.clear()
+
+        elif self.transition_stage == 'enter':
+            self.transition_blackout = max(0, self.transition_frames / s.transition_enter_frames)
+            prog = 1.0 - self.transition_frames / s.transition_enter_frames
+            self.ship.rect.y = int((self.screen_rect.height + 20)
+                                   + (self._transition_center_y - (self.screen_rect.height + 20)) * prog)
+            self._transition_spawn_trail()
+            self._transition_update_trails()
+            self._transition_update_streaks()
+            if self._transition_flash_frames > 0:
+                self._transition_flash_frames -= 1
+            if self.transition_frames <= 0:
+                self.in_transition = False
+                self.transition_stage = ''
+                self.transition_blackout = 0
+                self.ship.center_ship()
+                self._create_fleet()
+                self.settings.increase_speed()
+
+    def _transition_spawn_trail(self):
+        """Spawn engine trail particles behind the ship."""
+        self._transition_trail_timer -= 1
+        if self._transition_trail_timer > 0:
+            return
+        self._transition_trail_timer = self.settings.transition_trail_interval
+
+        cx = self.ship.rect.centerx
+        cy = self.ship.rect.bottom - 4
+        for _ in range(2):
+            trail = {
+                'x': cx + random.uniform(-6, 6),
+                'y': cy + random.uniform(-2, 6),
+                'life': random.randint(12, 22),
+                'max_life': 22,
+                'size': random.randint(2, 5),
+            }
+            self._trans_trails.append(trail)
+
+    def _transition_update_trails(self):
+        """Decay and remove engine trail particles."""
+        for t in self._trans_trails[:]:
+            t['life'] -= 1
+            t['y'] += random.uniform(-0.5, 0.8)
+            if self.transition_stage == 'exit':
+                t['y'] += random.uniform(1.0, 3.0)
+            if t['life'] <= 0:
+                self._trans_trails.remove(t)
+
+    def _transition_spawn_streaks(self):
+        """Spawn vertical star streaks during warp ascent."""
+        if random.random() < 0.5:
+            return
+        screen_w = self.screen_rect.width
+        streak = {
+            'x': random.randint(20, screen_w - 20),
+            'y': random.randint(-80, -10),
+            'height': random.randint(40, 150),
+            'alpha': random.randint(40, 140),
+            'speed': random.uniform(6.0, 14.0),
+        }
+        self._trans_streaks.append(streak)
+
+    def _transition_update_streaks(self):
+        """Move and remove star streaks."""
+        for st in self._trans_streaks[:]:
+            st['y'] += st['speed']
+            if self.transition_stage == 'enter':
+                st['alpha'] = max(0, st['alpha'] - 4)
+            if st['y'] - st['height'] > self.screen_rect.height or st['alpha'] <= 0:
+                self._trans_streaks.remove(st)
 
     def _draw_game_scene(self):
         """Draw all game entities (excluding pause/menu overlays)"""
@@ -1702,6 +2008,9 @@ class AlienInvasion:
             bullet.draw_bullet()
         self.missiles.draw(self.screen)
         if not is_dead:
+            # Shield effect: golden sphere around ship
+            if self.stats.items.get('shield', 0) > 0:
+                self._draw_shield()
             self.ship.blitme()
         self.aliens.draw(self.screen)
         for alien in self.aliens.sprites():
@@ -1733,6 +2042,14 @@ class AlienInvasion:
         # Clover flash overlay
         if self.clover_flash_frames > 0:
             self._draw_clover_flash()
+
+        # Near-death vignette
+        if self.stats.ship_hp <= self.settings.critical_hp_threshold:
+            self._draw_near_death_vignette()
+
+        # Level transition overlay
+        if self.in_transition:
+            self._draw_transition_overlay()
 
     def _update_screen(self):
         """Update screen image (render routed by current state)"""
@@ -1861,7 +2178,7 @@ class AlienInvasion:
                 if key == armor_tier:
                     pct = def_pct
                     break
-        return max(1, math.ceil(base_damage * (1.0 - pct)))
+        return max(1.0, round(base_damage * (1.0 - pct), 2))
 
     def _ship_hit(self, base_damage, colliding_alien=None):
         """Handle ship taking damage (from aliens, boss bullets, meteors, etc.)"""

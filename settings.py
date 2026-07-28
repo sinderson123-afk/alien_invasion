@@ -137,6 +137,8 @@ class Settings:
         self.alien_hp_per_level = 1     # HP increase per level
         self.bullet_damage = 1          # Bullet damage
         self.missile_damage = 5         # Missile explosion damage
+        self.bullet_damage_base = self.bullet_damage   # Unscaled base for skill multiplier
+        self.missile_damage_base = self.missile_damage
 
         # Level settings
         self.kills_per_level = 30       # Kills required per level
@@ -208,6 +210,7 @@ class Settings:
             'speed':    [3, 6, 12, 24, 48],
             'ammo':     [5, 10, 20, 40, 80],
             'vitality': [8, 16, 32, 64, 128],
+            'damage':   [10, 25, 50, 100, 200],
         }
         self.skill_max_level = 5
 
@@ -251,6 +254,27 @@ class Settings:
         self.boss_warning_duration = 90     # Boss entrance warning banner frames
         self.ship_death_duration = 60       # Ship death explosion frames
         self.fail_banner_duration = 90      # Fail banner display frames
+
+        # --- Level transition cinematic ---
+        self.transition_rise_frames = 90    # Ship ascends to center
+        self.transition_hover_frames = 80   # Ship hovers at center, text appears
+        self.transition_exit_frames = 50    # Ship flies right, screen blackens
+        self.transition_enter_frames = 60   # Ship enters from left, descends
+        self.transition_ship_rise_speed = 3.0   # Pixels/frame during rise
+        self.transition_ship_exit_speed = 12.0  # Pixels/frame during exit
+        self.transition_flash_frames = 15       # White flash on warp entry
+        self.transition_trail_interval = 2      # Frames between engine trail particles
+
+        # --- Shield visual ---
+        self.shield_pulse_speed = 0.12      # Alpha oscillation speed
+        self.shield_outer_radius = 48       # Outer glow radius
+        self.shield_inner_radius = 38       # Inner shell radius
+        self.shield_color = (255, 220, 60)  # Golden shield
+
+        # --- Near-death state ---
+        self.critical_hp_threshold = 10     # HP at which near-death triggers
+        self.vignette_max_alpha = 60        # Red vignette max opacity
+        self.heart_beat_interval = 20       # Frames per half-heart beat cycle
 
         # --- Save settings ---
         self._saves_dir = Path(os.path.dirname(sys.argv[0])) / "saves"

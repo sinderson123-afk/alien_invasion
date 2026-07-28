@@ -1,15 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-import sys
 from PyInstaller.utils.hooks import collect_all
 
 datas = [('resource', 'resource')]
 binaries = []
-hiddenimports = ['pygame']
+hiddenimports = ['pygame', 'cv2']
 tmp_ret = collect_all('pygame')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-
-# .ico is Windows-only; macOS needs .icns which we don't generate
-icon_file = 'icon.ico' if sys.platform == 'win32' else None
 
 
 a = Analysis(
@@ -18,7 +14,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -46,5 +42,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=[icon_file] if icon_file else None,
+    icon=['icon.ico'],
 )

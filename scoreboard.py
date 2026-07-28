@@ -1,3 +1,4 @@
+import math
 import pygame
 import pygame.font
 
@@ -120,7 +121,7 @@ class Scoreboard:
                          (bar_x, bar_y, int(bar_w * ratio), bar_h))
 
         # HP value
-        hp_text = f"HP: {cur_hp}/{max_hp}"
+        hp_text = f"HP: {cur_hp:.1f}/{max_hp}"
         hp_img = self.tiny_font.render(hp_text, True, (220, 220, 220))
         hp_rect = hp_img.get_rect(center=(bar_x + bar_w // 2, bar_y + bar_h // 2))
         self.screen.blit(hp_img, hp_rect)
@@ -130,6 +131,10 @@ class Scoreboard:
         self.screen.blit(self.score_image, self.score_rect)
         self.screen.blit(self.high_score_image, self.high_score_rect)
         self._draw_hp_bar()
+
+        # Near-death half-heart (beating)
+        if self.stats.ship_hp <= self.settings.critical_hp_threshold:
+            self._draw_half_heart()
 
         # Armor indicator
         if self.stats.armor_tier:
@@ -141,6 +146,8 @@ class Scoreboard:
                                                (100, 180, 255), self.settings.bg_color)
             armor_rect = armor_img.get_rect(topleft=(16, 42))
             self.screen.blit(armor_img, armor_rect)
+            # Defense pips
+            self._draw_armor_pips(armor_rect.right + 6, armor_rect.centery - 5, pct)
         else:
             armor_img = self.tiny_font.render("No Armor", True,
                                                (120, 120, 140), self.settings.bg_color)
@@ -176,3 +183,43 @@ class Scoreboard:
                 f"Magnet: {self.ai_game.magnet_timer // 60 + 1}s", True,
                 (255, 200, 100), self.settings.bg_color)
             self.screen.blit(mag_img, (16, mag_y))
+
+    def _draw_armor_pips(self, x, y, pct):
+        """Draw shield-shaped defense pips. Full = 10%, Half = 5%."""
+        pct_int = round(pct * 100)
+        full = pct_int // 10
+        half = 1 if pct_int % 10 >= 5 else 0
+        for i in range(full):
+            self._draw_pip(x + i * 10, y, True)
+        if half:
+            self._draw_pip(x + full * 10, y, False)
+
+    def _draw_pip(self, x, y, full=True):
+        """Draw a single shield pip (full or half-opacity)."""
+        color = (100, 180, 255) if full else (60, 110, 160)
+        # Small shield shape
+        pts = [(x + 4, y), (x + 8, y + 3), (x + 8, y + 7),
+               (x + 4, y + 10), (x, y + 7), (x, y + 3)]
+        pygame.draw.polygon(self.screen, color, pts)
+
+    def _draw_half_heart(self):
+        """Draw a beating half-heart icon when HP is critical."""
+        beat = abs(math.sin(pygame.time.get_ticks() * 0.008))
+        scale = 0.9 + beat * 0.3
+        size = int(18 * scale)
+        cx, cy = 16, 30
+
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        color = (220, 30, 60)
+        r = size // 4
+        # Left circle (full heart-left half)
+        pygame.draw.circle(surf, color, (r, r + 1), r)
+        # Half triangle
+        pts = [(0, r + 2), (size // 2, r + 2), (size // 2, size - 1)]
+        pygame.draw.polygon(surf, color, pts)
+        # Dark fill for the "missing" right half
+        dark = pygame.Surface((size, size), pygame.SRCALPHA)
+        dark.fill((0, 0, 0, 120))
+        surf.blit(dark, (size // 2, 0), pygame.Rect(0, 0, size // 2, size))
+
+        self.screen.blit(surf, (cx - size // 2, cy - size // 2))

@@ -50,7 +50,7 @@ def draw_shop(screen, stats, settings):
     screen.blit(overlay, (0, 0))
 
     # Center panel
-    panel_w, panel_h = 640, 620
+    panel_w, panel_h = 640, 670
     panel = pygame.Surface((panel_w, panel_h))
     panel.fill((40, 40, 60))
     panel_rect = panel.get_rect(center=screen.get_rect().center)
@@ -153,6 +153,8 @@ def draw_shop(screen, stats, settings):
         ('speed', 'Speed Boost', '+10% ship speed/lv', settings.skill_costs['speed']),
         ('ammo', 'Ammo Capacity', '+1 bullet/lv', settings.skill_costs['ammo']),
         ('vitality', 'Vitality', '+1 max life/lv', settings.skill_costs['vitality']),
+        ('damage', 'Damage Boost', '+20% bullet & missile dmg/lv',
+         settings.skill_costs['damage']),
     ]
 
     for i, (key, name, desc, costs) in enumerate(skills):
