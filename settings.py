@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 
-GAME_VERSION = "1.2.0"
+GAME_VERSION = "1.3.0"
 
 try:
     from _build_info import DEV_BUILD as IS_DEV_BUILD
