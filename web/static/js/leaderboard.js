@@ -3,7 +3,6 @@ let pollInterval = null;
 
 const MIRROR_BASES = [
   "https://gh.llkk.cc/",
-  "https://github.akams.cn/",
   "https://gh-proxy.com/",
 ];
 
@@ -18,9 +17,11 @@ async function probeURL(url, timeout = 7000) {
     const xhr = new XMLHttpRequest();
     const timer = setTimeout(() => resolve(Infinity), timeout);
     xhr.onreadystatechange = () => {
-      if (xhr.readyState >= 3) {
+      // readyState 2 = headers received: HTTP status known, body not downloaded
+      if (xhr.readyState >= 2) {
         clearTimeout(timer);
-        resolve(performance.now() - start);
+        const ok = xhr.status >= 200 && xhr.status < 300;
+        resolve(ok ? performance.now() - start : Infinity);
         xhr.abort();
       }
     };
