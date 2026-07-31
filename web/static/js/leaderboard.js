@@ -1,9 +1,15 @@
 const SERVER_URL = "https://alien-invasion-1018096304579.asia-east1.run.app";
 let pollInterval = null;
 
-const MIRROR_BASES = [
-  "https://gh.llkk.cc/",
-  "https://gh-proxy.com/",
+const MIRRORS = [
+  // path-prefix style: https://mirror/<full github url>
+  { name: "gh.llkk.cc", build: (u) => "https://gh.llkk.cc/" + u },
+  // query-param style: https://mirror/?url=<full github url>
+  {
+    name: "github.akams.cn",
+    build: (u) => "https://github.akams.cn/?url=" + encodeURIComponent(u),
+  },
+  { name: "gh-proxy.com", build: (u) => "https://gh-proxy.com/" + u },
 ];
 
 const GITHUB_RELEASE_BASE =
@@ -38,14 +44,10 @@ async function probeURL(url, timeout = 7000) {
 async function pickFastestDownload(tag) {
   const basename = `/AlienInvasion.exe`;
   const directUrl = `${GITHUB_RELEASE_BASE}/${tag}${basename}`;
-  const fullPath = `${GITHUB_RELEASE_BASE}/${tag}${basename}`;
 
   const sources = [
     { name: "GitHub Direct", build: () => directUrl },
-    ...MIRROR_BASES.map((base) => ({
-      name: new URL(base).hostname,
-      build: () => base + fullPath,
-    })),
+    ...MIRRORS.map((m) => ({ name: m.name, build: () => m.build(directUrl) })),
   ];
 
   const probes = sources.map(async (src) => {
