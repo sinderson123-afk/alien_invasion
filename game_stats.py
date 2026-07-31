@@ -30,6 +30,13 @@ class GameStats:
         self.items = saved['items']
         self.skills = saved['skills']
         self.armor_tier = saved['armor']
+        self.equipped_gems = saved.get('equipped_gems', [None] * 5)
+        if not isinstance(self.equipped_gems, list) or len(self.equipped_gems) < 5:
+            self.equipped_gems = [None] * 5
+        self.gem_storage = saved.get('gem_storage', [])
+        if not isinstance(self.gem_storage, list):
+            self.gem_storage = []
+        self._gem_stat_cache = None
 
         self.reset_stats()
 
@@ -53,7 +60,9 @@ class GameStats:
 
     def save_player_data(self):
         """Save persistent data"""
-        self.player_data.save(self.coins, self.items, self.skills, armor=self.armor_tier)
+        self.player_data.save(self.coins, self.items, self.skills, armor=self.armor_tier,
+                              equipped_gems=self.equipped_gems,
+                              gem_storage=self.gem_storage)
 
     @property
     def level(self):

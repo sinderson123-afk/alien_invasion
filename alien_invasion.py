@@ -18,6 +18,7 @@ from sound import SoundManager
 from boss import Boss
 from boss_bullet import BossBullet
 from coin import Coin
+from gem import GemPickup, generate_gem, upgrade_gem, get_gem_bonuses, init_gem_id_counter
 from scrolling_background import ScrollingBackground
 from video_background import VideoBackground
 from menu import MenuSystem
@@ -43,6 +44,7 @@ class AlienInvasion:
         pygame.display.set_caption("Alien Invasion")
 
         self.stats = GameStats(self)
+        init_gem_id_counter(self.stats.equipped_gems, self.stats.gem_storage)
         self.sb = Scoreboard(self)
 
         self.ship = Ship(self)
@@ -52,6 +54,7 @@ class AlienInvasion:
         self.particles = pygame.sprite.Group()
         self.boss_bullets = pygame.sprite.Group()
         self.coins = pygame.sprite.Group()
+        self.gems = pygame.sprite.Group()
         self.meteors = pygame.sprite.Group()
         self.meteor_fragments = pygame.sprite.Group()
         self.boss = None                    # Boss reference (not None during boss level)
@@ -103,6 +106,8 @@ class AlienInvasion:
         self.show_notifications = False    # Whether notification panel is shown
         self.clover_flash_frames = 0       # Clover screen flash countdown
         self.clover_push_frames = 0        # Clover push animation countdown
+        self.firing = False                # Spacebar held for auto-fire
+        self._fire_cooldown = 0            # Auto-fire frame timer
         self._update_available = None      # (version, url) when update found
         self.in_transition = False         # Level transition cinematic active
         self.transition_stage = ''         # 'rise', 'hover', 'exit', 'enter'
@@ -158,13 +163,21 @@ class AlienInvasion:
                 elif self.clover_push_frames > 0:
                     self._update_clover_push()
                     self.ship.update()
+                    if self.firing:
+                        if self._fire_cooldown > 0:
+                            self._fire_cooldown -= 1
+                        else:
+                            self._fire_bullet()
+                            self._fire_cooldown = self.settings.bullet_fire_cooldown
                     self._update_bullets()
                     self._update_missiles()
                     if self.boss is not None:
                         self.boss.update()
                     self.coins.update()
+                    self.gems.update()
                     self._update_magnet()
                     self._check_coin_pickup()
+                    self._check_gem_pickup()
                     self._spawn_meteor()
                     self.particles.update()
                 elif self.hit_cooldown > 0:
@@ -174,8 +187,10 @@ class AlienInvasion:
                     if self.boss is not None:
                         self.boss.update()
                     self.coins.update()
+                    self.gems.update()
                     self._update_magnet()
                     self._check_coin_pickup()
+                    self._check_gem_pickup()
                     self.meteors.update()
                     self.meteor_fragments.update()
                     self._update_meteor_collisions(skip_ship=True)
@@ -197,6 +212,12 @@ class AlienInvasion:
                         self.flashing_alien_pos = None
                 else:
                     self.ship.update()
+                    if self.firing:
+                        if self._fire_cooldown > 0:
+                            self._fire_cooldown -= 1
+                        else:
+                            self._fire_bullet()
+                            self._fire_cooldown = self.settings.bullet_fire_cooldown
                     self._update_bullets()
                     self._update_missiles()
                     self._update_boss_bullets()
@@ -204,8 +225,10 @@ class AlienInvasion:
                         self.boss.update()
                     self._update_aliens()
                     self.coins.update()
+                    self.gems.update()
                     self._update_magnet()
                     self._check_coin_pickup()
+                    self._check_gem_pickup()
                     self.meteors.update()
                     self.meteor_fragments.update()
                     self._update_meteor_collisions(skip_ship=False)
@@ -347,13 +370,17 @@ class AlienInvasion:
                 self._quit_game()
 
         elif self.state == GameState.SHOP:
-            changed, action = shop.handle_shop_click(
-                mouse_pos, self.stats, self.settings)
-            if action == 'close':
-                self.state = self.previous_state
-            elif changed:
-                self.sb.prep_coins()
-                self._apply_skills()
+            result = shop.handle_shop_click(
+                mouse_pos, self.stats, self.settings, ai_game=self)
+            if isinstance(result, tuple) and len(result) == 3 and result[1] == 'tab_switch':
+                self._shop_tab = result[2]
+            else:
+                changed, action = result
+                if action == 'close':
+                    self.state = self.previous_state
+                elif changed:
+                    self.sb.prep_coins()
+                    self._apply_skills()
 
         elif self.state == GameState.TUTORIAL:
             action = self.menu_system.handle_tutorial_click(mouse_pos)
@@ -378,6 +405,60 @@ class AlienInvasion:
         dmg_mult = 1 + skills.get('damage', 0) * 0.2
         s.bullet_damage = round(s.bullet_damage_base * dmg_mult, 2)
         s.missile_damage = round(s.missile_damage_base * dmg_mult, 2)
+        self._pre_gem_bullet_dmg = s.bullet_damage
+        self._pre_gem_missile_dmg = s.missile_damage
+        self._apply_gems()
+
+    def _apply_gems(self):
+        """Apply gem stat bonuses to settings and cache them."""
+        bonuses = get_gem_bonuses(self.stats.equipped_gems)
+        self._gem_bonuses = bonuses
+        s = self.settings
+
+        hp_bonus = bonuses['hp']
+        def_bonus = bonuses['defense']
+        dmg_pct = 1 + bonuses['damage'] / 100.0
+        gold_bonus = bonuses['gold'] / 100.0
+
+        base_bullet = getattr(self, '_pre_gem_bullet_dmg', s.bullet_damage_base)
+        base_missile = getattr(self, '_pre_gem_missile_dmg', s.missile_damage_base)
+        s.bullet_damage = round(base_bullet * dmg_pct, 2)
+        s.missile_damage = round(base_missile * dmg_pct, 2)
+        s.coin_drop_rate = s.coin_drop_rate_base + gold_bonus
+
+        self._gem_defense_pct = def_bonus / 100.0
+        self._gem_hp_bonus = int(hp_bonus)
+
+        self.stats.max_hp = self.stats._calc_max_hp() + self._gem_hp_bonus
+        if self.stats.ship_hp > self.stats.max_hp:
+            self.stats.ship_hp = self.stats.max_hp
+
+    def _get_crit_chance(self):
+        """Get current crit rate (capped)."""
+        bonuses = getattr(self, '_gem_bonuses', {})
+        rate = (self.settings.crit_rate_base
+                + (self.stats.level - 1) * self.settings.crit_rate_per_level
+                + bonuses.get('crit_rate', 0) / 100.0)
+        return min(rate, self.settings.crit_rate_cap)
+
+    def _get_crit_multiplier(self):
+        """Get current crit damage multiplier (capped)."""
+        bonuses = getattr(self, '_gem_bonuses', {})
+        return min(self.settings.crit_dmg_base
+                   + (self.stats.level - 1) * self.settings.crit_dmg_per_level
+                   + bonuses.get('crit_dmg', 0) / 100.0,
+                   self.settings.crit_dmg_cap)
+
+    def _get_pen_chance(self):
+        """Get current bullet penetration chance."""
+        bonuses = getattr(self, '_gem_bonuses', {})
+        return bonuses.get('penetration', 0) / 100.0
+
+    def _roll_crit(self):
+        """Check if this hit is a crit; return (is_crit, damage_multiplier)."""
+        if random.random() < self._get_crit_chance():
+            return True, self._get_crit_multiplier()
+        return False, 1.0
 
     def _quit_game(self):
         """Save high score and player data, then quit"""
@@ -428,6 +509,8 @@ class AlienInvasion:
         self.in_transition = False
         self.transition_stage = ''
         self.transition_blackout = 0
+        self.firing = False
+        self._fire_cooldown = 0
 
         # Switch to game state
         self.state = GameState.PLAYING
@@ -454,6 +537,8 @@ class AlienInvasion:
         self.in_transition = False
         self.transition_stage = ''
         self.transition_blackout = 0
+        self.firing = False
+        self._fire_cooldown = 0
         self.state = GameState.MENU
         self.sound.set_bgm_volume(self.settings.bgm_volume)
         self.sound.play_menu_bgm()
@@ -473,7 +558,7 @@ class AlienInvasion:
                 flashing_alien_id = None
 
         data = {
-            'version': 4,  # Save format version
+            'version': 5,  # Save format version
             'stats': {
                 'score': self.stats.score,
                 'kills': self.stats.kills,
@@ -485,6 +570,8 @@ class AlienInvasion:
                 'items': dict(self.stats.items),
                 'skills': dict(self.stats.skills),
                 'armor_tier': self.stats.armor_tier,
+                'equipped_gems': [g if g else None for g in self.stats.equipped_gems],
+                'gem_storage': list(self.stats.gem_storage),
                 'high_score': self.stats.high_score,
             },
             'settings': {
@@ -634,7 +721,14 @@ class AlienInvasion:
             ss.setdefault('missile_damage', 5)
             data.setdefault('version', 4)
             save_ver = 4
-        # future v4 -> v5 appended here
+        if save_ver < 5:
+            # v4 -> v5: add equipped_gems / gem_storage
+            s = data.setdefault('stats', {})
+            s.setdefault('equipped_gems', [None] * 5)
+            s.setdefault('gem_storage', [])
+            data.setdefault('version', 5)
+            save_ver = 5
+        # future v5 -> v6 appended here
         return data
 
     def _resume_game(self):
@@ -657,6 +751,13 @@ class AlienInvasion:
         self.stats.items = s['items']
         self.stats.skills = s['skills']
         self.stats.armor_tier = s.get('armor_tier', None)
+        self.stats.equipped_gems = s.get('equipped_gems', [None] * 5)
+        if not isinstance(self.stats.equipped_gems, list) or len(self.stats.equipped_gems) < 5:
+            self.stats.equipped_gems = [None] * 5
+        self.stats.gem_storage = s.get('gem_storage', [])
+        if not isinstance(self.stats.gem_storage, list):
+            self.stats.gem_storage = []
+        init_gem_id_counter(self.stats.equipped_gems, self.stats.gem_storage)
         self.stats.high_score = s['high_score']
 
         # --- Restore dynamic settings ---
@@ -871,6 +972,8 @@ class AlienInvasion:
                 # Pause and clear movement flags
                 self.ship.moving_right = False
                 self.ship.moving_left = False
+                self.firing = False
+                self._fire_cooldown = 0
                 self.save_disabled = False
                 self.state = GameState.PAUSED
                 self.sound.set_bgm_volume(self.settings.bgm_pause_volume)
@@ -879,6 +982,7 @@ class AlienInvasion:
             elif event.key == pygame.K_LEFT:
                 self.ship.moving_left = True
             elif event.key == pygame.K_SPACE:
+                self.firing = True
                 self._fire_bullet()
             elif event.key == pygame.K_e:
                 self._fire_missile()
@@ -922,6 +1026,13 @@ class AlienInvasion:
                 self.ship.moving_right = False
             elif event.key == pygame.K_LEFT:
                 self.ship.moving_left = False
+            elif event.key == pygame.K_SPACE:
+                self.firing = False
+                self._fire_cooldown = 0
+        else:
+            # Clear firing on key release regardless of state
+            if event.key == pygame.K_SPACE:
+                self.firing = False
 
     def _update_bullets(self):
         """Update bullet positions and remove off-screen bullets"""
@@ -937,15 +1048,26 @@ class AlienInvasion:
         self._check_bullet_boss_collisions()
 
     def _check_bullet_alien_collisions(self):
-        """Handle bullet-alien collisions: damage, explode on death, score"""
-        # dokill1=False: damage system instead of direct removal
-        collisions = pygame.sprite.groupcollide(self.aliens, self.bullets, False, True)
-        for alien, bullets in collisions.items():
-            # Multiple bullets hitting same alien in one frame stack damage
-            total_damage = self.settings.bullet_damage * len(bullets)
-            if alien.take_damage(total_damage):
+        """Handle bullet-alien collisions with crit (+ penetration)。"""
+        pen_chance = self._get_pen_chance()
+        collisions = pygame.sprite.groupcollide(self.aliens, self.bullets, False, False)
+        for alien, bullet_list in collisions.items():
+            total_damage = 0.0
+            for bullet in bullet_list:
+                dmg = self.settings.bullet_damage
+                is_crit, crit_mult = self._roll_crit()
+                if is_crit:
+                    dmg *= crit_mult
+                total_damage += dmg
+
+                if pen_chance <= 0 or random.random() >= pen_chance:
+                    if bullet in self.bullets:
+                        self.bullets.remove(bullet)
+
+            if alien.take_damage(round(total_damage, 2)):
                 self._create_explosion(alien.rect.center)
                 self._maybe_drop_coin(*alien.rect.center)
+                self._maybe_drop_gem(*alien.rect.center)
                 self.sound.play_explosion()
                 self._award_points(1)
             else:
@@ -990,9 +1112,14 @@ class AlienInvasion:
         destroyed = 0
         for alien in self.aliens.sprites():
             if blast_center.distance_to(alien.rect.center) <= self.settings.missile_blast_radius:
-                if alien.take_damage(self.settings.missile_damage):
+                dmg = self.settings.missile_damage
+                is_crit, crit_mult = self._roll_crit()
+                if is_crit:
+                    dmg *= crit_mult
+                if alien.take_damage(round(dmg, 2)):
                     self._create_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
+                    self._maybe_drop_gem(*alien.rect.center)
                     destroyed += 1
                     self.sound.play_explosion()
                 else:
@@ -1000,7 +1127,11 @@ class AlienInvasion:
         # Also check if boss is in blast radius
         if self.boss is not None and self.boss.hp > 0:
             if blast_center.distance_to(self.boss.rect.center) <= self.settings.missile_blast_radius:
-                if self.boss.take_damage(self.settings.missile_damage):
+                dmg = self.settings.missile_damage
+                is_crit, crit_mult = self._roll_crit()
+                if is_crit:
+                    dmg *= crit_mult
+                if self.boss.take_damage(round(dmg, 2)):
                     self._create_explosion(self.boss.rect.center)
                     self._maybe_drop_coin(*self.boss.rect.center)
                     destroyed += 1
@@ -1473,11 +1604,13 @@ class AlienInvasion:
         """Check if missile explosion hits boss"""
         if self.boss is None or self.boss.hp <= 0:
             return
-        # Missile direct hit on boss body
         for missile in self.missiles.sprites():
-            # Missile hits boss
             if missile.rect.colliderect(self.boss.rect):
-                if self.boss.take_damage(self.settings.missile_damage):
+                dmg = self.settings.missile_damage
+                is_crit, crit_mult = self._roll_crit()
+                if is_crit:
+                    dmg *= crit_mult
+                if self.boss.take_damage(round(dmg, 2)):
                     self._create_explosion(self.boss.rect.center)
                     self._maybe_drop_coin(*self.boss.rect.center)
                     self.sound.play_explosion()
@@ -1495,7 +1628,11 @@ class AlienInvasion:
         for bullet in self.bullets.sprites():
             if bullet.rect.colliderect(self.boss.rect):
                 self.bullets.remove(bullet)
-                if self.boss.take_damage(self.settings.bullet_damage):
+                dmg = self.settings.bullet_damage
+                is_crit, crit_mult = self._roll_crit()
+                if is_crit:
+                    dmg *= crit_mult
+                if self.boss.take_damage(round(dmg, 2)):
                     self._create_explosion(self.boss.rect.center)
                     self._maybe_drop_coin(*self.boss.rect.center)
                     self.sound.play_explosion()
@@ -1526,6 +1663,7 @@ class AlienInvasion:
                 self.sound.play_boss_destroy()
                 self._create_boss_explosion(self.boss.rect.center)
                 self._maybe_drop_coin(*self.boss.rect.center)
+                self._drop_gem(*self.boss.rect.center)
                 self.boss.kill()
                 self.boss = None
                 # Boss kill reward: supplement score and kills to exit level
@@ -1686,6 +1824,25 @@ class AlienInvasion:
         """Drop coin at position with probability"""
         if random.random() < self.settings.coin_drop_rate:
             self.coins.add(Coin(self, x, y))
+
+    def _maybe_drop_gem(self, x, y):
+        """Drop gem on alien kill (very low chance)."""
+        if random.random() < self.settings.gem_alien_drop_rate:
+            gem_data = generate_gem(self.settings)
+            self.gems.add(GemPickup(self, x, y, gem_data))
+
+    def _drop_gem(self, x, y):
+        """Guaranteed gem drop (boss kill)."""
+        for _ in range(self.settings.gem_boss_drop_count):
+            gem_data = generate_gem(self.settings)
+            self.gems.add(GemPickup(self, x, y, gem_data))
+
+    def _check_gem_pickup(self):
+        """Check if ship picked up gems."""
+        picked = pygame.sprite.spritecollide(self.ship, self.gems, True)
+        for gem_sprite in picked:
+            self.stats.gem_storage.append(gem_sprite.gem_data)
+            self.stats.save_player_data()
 
     # ------------------------------------------------------------------
     # Meteor system
@@ -1942,6 +2099,8 @@ class AlienInvasion:
                 self.in_transition = False
                 self.transition_stage = ''
                 self.transition_blackout = 0
+                self.firing = False
+                self._fire_cooldown = 0
                 self.ship.center_ship()
                 self._create_fleet()
                 self.settings.increase_speed()
@@ -2020,6 +2179,7 @@ class AlienInvasion:
             self.screen.blit(self.boss.image, self.boss.rect)
             self.boss.draw_hp_bar()
         self.coins.draw(self.screen)
+        self.gems.draw(self.screen)
         self.meteors.draw(self.screen)
         self.meteor_fragments.draw(self.screen)
         self.particles.draw(self.screen)
@@ -2086,7 +2246,8 @@ class AlienInvasion:
                 self._draw_game_scene()
             else:
                 self.menu_bg.draw()
-            shop.draw_shop(self.screen, self.stats, self.settings)
+            shop.draw_shop(self.screen, self.stats, self.settings,
+                           ai_game=self, tab=getattr(self, '_shop_tab', 'shop'))
 
         elif self.state == GameState.TUTORIAL:
             self.menu_bg.draw()

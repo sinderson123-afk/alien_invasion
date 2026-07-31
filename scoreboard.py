@@ -159,6 +159,24 @@ class Scoreboard:
         self.screen.blit(self.level_image, self.level_rect)
         self.screen.blit(self.coins_image, self.coins_rect)
 
+        # Crit & penetration indicators
+        from gem import get_gem_bonuses
+        bonuses = get_gem_bonuses(self.stats.equipped_gems)
+        crit_rate = (self.settings.crit_rate_base
+                     + (self.stats.level - 1) * self.settings.crit_rate_per_level
+                     + bonuses.get('crit_rate', 0) / 100.0)
+        crit_rate = min(crit_rate, self.settings.crit_rate_cap)
+        pen_chance = bonuses.get('penetration', 0) / 100.0
+
+        if crit_rate > 0.05 or pen_chance > 0:
+            crit_str = f"Crit: {crit_rate*100:.0f}%"
+            if pen_chance > 0:
+                crit_str += f" | Pierce: {pen_chance*100:.0f}%"
+            crit_img = self.tiny_font.render(crit_str, True,
+                                              (255, 200, 80), self.settings.bg_color)
+            crit_rect = crit_img.get_rect(topleft=(16, self.coins_rect.bottom + 4))
+            self.screen.blit(crit_img, crit_rect)
+
         # Shield icon (if any)
         if self.stats.items.get('shield', 0) > 0:
             shield_img = self.small_font.render(

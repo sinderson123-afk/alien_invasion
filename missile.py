@@ -36,8 +36,8 @@ class Missile(Sprite):
         super().__init__()
         self.screen = ai_game.screen
         self.settings = ai_game.settings
-        # Store aliens group ref for per-frame targeting
         self.aliens = ai_game.aliens
+        self.ai_game = ai_game
 
         self.base_image = create_missile_image()
         self.image = self.base_image
@@ -69,10 +69,17 @@ class Missile(Sprite):
         self.rect = self.image.get_rect(center=(self.x, self.y))
 
     def _find_nearest_alien(self):
-        """Return nearest alien to missile, or None if no aliens"""
-        aliens = self.aliens.sprites()
-        if not aliens:
-            return None
+        """Return nearest target (alien or boss), or None if no targets"""
         position = pygame.math.Vector2(self.x, self.y)
-        return min(aliens,
-                   key=lambda alien: position.distance_squared_to(alien.rect.center))
+        targets = list(self.aliens.sprites())
+
+        boss = getattr(self, 'ai_game', None)
+        if boss is not None:
+            boss = boss.boss
+        if boss is not None and boss.hp > 0:
+            targets.append(boss)
+
+        if not targets:
+            return None
+        return min(targets,
+                   key=lambda t: position.distance_squared_to(t.rect.center))

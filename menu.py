@@ -62,7 +62,7 @@ class MenuSystem:
         self.btn_start._prep_msg("Start Game")
 
         self.btn_shop = Button(
-            self.ai_game, "Shop",
+            self.ai_game, "Shop / Gems",
             width=btn_w, height=btn_h,
             button_color=self.settings.menu_shop_color,
             hover_color=self.settings.menu_shop_hover,

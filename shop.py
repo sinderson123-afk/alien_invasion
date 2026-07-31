@@ -1,6 +1,7 @@
 """Shop and skill tree UI"""
 
 import pygame
+from gem_ui import draw_gem_tab, handle_gem_tab_click
 
 
 # Button area records (populated by draw_shop for click detection)
@@ -39,7 +40,7 @@ def _get_armor_pct(armor_tier, settings):
     return 0.0
 
 
-def draw_shop(screen, stats, settings):
+def draw_shop(screen, stats, settings, ai_game=None, tab='shop'):
     """Draw shop/skill tree UI, return button list for click detection"""
     global shop_buttons
     shop_buttons = []
@@ -60,6 +61,7 @@ def draw_shop(screen, stats, settings):
     font_section = pygame.font.SysFont(None, 32)
     font_text = pygame.font.SysFont(None, 26)
     font_small = pygame.font.SysFont(None, 22)
+    font_tab = pygame.font.SysFont(None, 28)
     gold_color = (255, 215, 0)
     white = (255, 255, 255)
     green = (100, 220, 100)
@@ -68,16 +70,38 @@ def draw_shop(screen, stats, settings):
 
     px, py = panel_rect.topleft
 
-    # Title + coins
-    title = font_title.render("SHOP", True, gold_color)
-    screen.blit(title, (px + 300, py + 12))
+    # ── Tab bar ──
+    tab_y = py + 8
+    tab_w = 140
+    tab_h = 32
+    tabs = [('shop', 'Shop'), ('gems', 'Gems')]
+    for t_key, t_label in tabs:
+        tx = px + panel_w // 2 - tab_w + tabs.index((t_key, t_label)) * (tab_w + 4)
+        tab_rect = pygame.Rect(tx, tab_y, tab_w, tab_h)
+        if tab == t_key:
+            pygame.draw.rect(screen, (60, 60, 85), tab_rect)
+            pygame.draw.rect(screen, gold_color, tab_rect, 2)
+        else:
+            pygame.draw.rect(screen, (35, 35, 50), tab_rect)
+            pygame.draw.rect(screen, (70, 70, 90), tab_rect, 1)
+        tab_img = font_tab.render(t_label, True, gold_color if tab == t_key else gray)
+        tab_rect_img = tab_img.get_rect(center=tab_rect.center)
+        screen.blit(tab_img, tab_rect_img)
+        shop_buttons.append(('tab_switch', t_key, 0, tab_rect))
 
+    # ── Coin display (top-right) ──
     coins_text = f"$ {stats.coins}"
     coins_img = font_section.render(coins_text, True, gold_color)
     screen.blit(coins_img, (px + panel_w - 120, py + 15))
 
+    # Route to gem tab
+    if tab == 'gems':
+        gem_btns = draw_gem_tab(screen, stats, settings, panel_rect)
+        shop_buttons.extend(gem_btns)
+        return shop_buttons
+
     # --- Items section ---
-    item_y = py + 55
+    item_y = py + 50
     screen.blit(font_section.render("Items", True, white), (px + 30, item_y))
 
     items = [
@@ -199,7 +223,7 @@ def draw_shop(screen, stats, settings):
     return shop_buttons
 
 
-def handle_shop_click(mouse_pos, stats, settings):
+def handle_shop_click(mouse_pos, stats, settings, ai_game=None):
     """
     Handle click events in shop.
     Returns: (has_change: bool, action: str | None)
@@ -209,6 +233,14 @@ def handle_shop_click(mouse_pos, stats, settings):
         if rect.collidepoint(mouse_pos):
             if action == 'close_shop':
                 return (False, 'close')
+            elif action == 'tab_switch':
+                return (True, 'tab_switch', key)
+            elif action in ('equip_slot', 'unequip_gem', 'select_gem',
+                            'storage_scroll_up', 'storage_scroll_down',
+                            'upgrade_gem', 'discard_gem'):
+                if ai_game:
+                    result = handle_gem_tab_click(mouse_pos, stats, settings, ai_game)
+                    return result
             elif action == 'buy_item' and stats.coins >= cost:
                 stats.coins -= cost
                 stats.items[key] = stats.items.get(key, 0) + 1

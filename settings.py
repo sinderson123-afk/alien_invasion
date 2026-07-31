@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 
-GAME_VERSION = "1.3.0"
+GAME_VERSION = "1.4.0"
 
 try:
     from _build_info import DEV_BUILD as IS_DEV_BUILD
@@ -34,6 +34,7 @@ class Settings:
 
         # Bullet settings
         self.bullet_speed = 2.5
+        self.bullet_speed_max = 6.0       # Max bullet speed cap
         self.bullet_width = 3
         self.bullet_height = 15
         self.bullet_color = (0, 255, 80)        # Bright green
@@ -139,6 +140,7 @@ class Settings:
         self.missile_damage = 5         # Missile explosion damage
         self.bullet_damage_base = self.bullet_damage   # Unscaled base for skill multiplier
         self.missile_damage_base = self.missile_damage
+        self.bullet_fire_cooldown = 8  # Frames between auto-fire shots
 
         # Level settings
         self.kills_per_level = 30       # Kills required per level
@@ -159,6 +161,7 @@ class Settings:
 
         # Coin settings
         self.coin_drop_rate = 0.3           # Coin drop rate on alien kill
+        self.coin_drop_rate_base = self.coin_drop_rate
         self.coin_fall_speed = 2.0          # Coin fall speed
         self.coin_hover_y_margin = 60       # Coin hover distance from bottom
         self.coin_hover_duration = 180      # Hover duration (frames, 3s)
@@ -182,6 +185,30 @@ class Settings:
         self.clover_teleport_y = 0          # Final exit y coordinate
         self.clover_push_duration = 35      # Push animation duration (frames)
         self.clover_push_speed = 20         # Push speed (pixels/frame)
+
+        # --- Crit & Penetration system ---
+        self.crit_rate_base = 0.05          # Base crit rate (5%)
+        self.crit_dmg_base = 1.50           # Base crit damage multiplier (150% = 1.5x)
+        self.crit_rate_per_level = 0.01     # +1% crit rate per game level
+        self.crit_dmg_per_level = 0.01      # +1% crit dmg per game level
+        self.crit_rate_cap = 0.80           # Max crit rate (80%)
+        self.crit_dmg_cap = 3.00            # Max crit damage multiplier (300% = 4x)
+
+        # --- Gem system ---
+        self.gem_alien_drop_rate = 0.005    # Alien gem drop rate (0.5%)
+        self.gem_boss_drop_count = 1        # Gems dropped by boss on death
+        self.gem_upgrade_cost_base = 50     # Upgrade cost per level (level * base)
+        self.gem_max_equip = 5              # Max equipped gems
+        self.gem_base_values = {            # Base values for main stats at level 1
+            'hp': 5, 'defense': 3, 'damage': 5,
+            'crit_rate': 2, 'crit_dmg': 5, 'gold': 3, 'penetration': 2,
+        }
+        self.gem_sub_stat_ratio = 0.5       # Sub-stat value as fraction of main stat
+        self.gem_names = [                  # Random gem name pool
+            "Ruby", "Sapphire", "Emerald", "Topaz", "Amethyst",
+            "Diamond", "Onyx", "Opal", "Jade", "Garnet",
+            "Citrine", "Aquamarine", "Peridot", "Tourmaline", "Turquoise",
+        ]
 
         # --- Armor System ---
         # Armor tiers: name -> (defense_pct, full_price)
@@ -299,6 +326,8 @@ class Settings:
         if self.ship_speed > self.ship_speed_max:
             self.ship_speed = self.ship_speed_max
         self.bullet_speed *= self.speedup_scale
+        if self.bullet_speed > self.bullet_speed_max:
+            self.bullet_speed = self.bullet_speed_max
         self.alien_speed *= self.speedup_scale
         if self.alien_speed > self.alien_speed_max:
             self.alien_speed = self.alien_speed_max

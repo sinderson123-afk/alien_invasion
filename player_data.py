@@ -11,6 +11,8 @@ _DEFAULTS = {
     'items': {'magnet': 0, 'shield': 0, 'clover': 0},
     'skills': {'speed': 0, 'ammo': 0, 'vitality': 0, 'damage': 0},
     'armor': None,
+    'equipped_gems': [None, None, None, None, None],
+    'gem_storage': [],
     'token': '',
     'username': '',
     'email': '',
@@ -36,13 +38,17 @@ class PlayerData:
             'items': data.get('items', {'magnet': 0, 'shield': 0, 'clover': 0}),
             'skills': data.get('skills', {'speed': 0, 'ammo': 0, 'vitality': 0}),
             'armor': data.get('armor', None),
+            'equipped_gems': data.get('equipped_gems', [None] * 5),
+            'gem_storage': data.get('gem_storage', []),
             'token': data.get('token', ''),
             'username': data.get('username', ''),
             'email': data.get('email', ''),
         }
 
-    def save(self, coins, items, skills, armor=None, token='', username='', email=''):
-        data = {'coins': coins, 'items': items, 'skills': skills, 'armor': armor}
+    def save(self, coins, items, skills, armor=None, equipped_gems=None,
+             gem_storage=None, token='', username='', email=''):
+        data = {'coins': coins, 'items': items, 'skills': skills, 'armor': armor,
+                'equipped_gems': equipped_gems, 'gem_storage': gem_storage}
         existing = self.load()
         if token:
             data['token'] = token
@@ -61,6 +67,8 @@ class PlayerData:
         self.save(
             existing['coins'], existing['items'], existing['skills'],
             token=token, username=username, email=existing['email'],
+            equipped_gems=existing.get('equipped_gems', [None] * 5),
+            gem_storage=existing.get('gem_storage', []),
         )
 
     def save_email(self, email: str):
@@ -69,6 +77,8 @@ class PlayerData:
             existing['coins'], existing['items'], existing['skills'],
             token=existing['token'], username=existing['username'],
             email=email,
+            equipped_gems=existing.get('equipped_gems', [None] * 5),
+            gem_storage=existing.get('gem_storage', []),
         )
 
     def get_token(self) -> str:
