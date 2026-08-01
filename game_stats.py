@@ -52,11 +52,12 @@ class GameStats:
         # Missile stock and total awarded by score (to check new thresholds)
         self.missiles = 0
         self.missiles_awarded = 0
+        self.crit_count = 0                 # Session crit counter
         # coins/items/skills/armor are persistent, not reset per session
 
     def _calc_max_hp(self):
         """Calculate max HP: base HP * multiplier + vitality skill bonus"""
-        return (self.settings.ship_limit + self.skills['vitality']) * self.settings.ship_hp_multiplier
+        return (self.settings.ship_limit + self.skills.get('vitality', 0)) * self.settings.ship_hp_multiplier
 
     def save_player_data(self):
         """Save persistent data"""

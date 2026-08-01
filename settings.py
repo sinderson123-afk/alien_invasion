@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 
-GAME_VERSION = "1.4.0"
+GAME_VERSION = "1.4.1"
 
 try:
     from _build_info import DEV_BUILD as IS_DEV_BUILD
@@ -97,6 +97,20 @@ class Settings:
         ]
         self.boss_secondary_count = 40        # Secondary burst particle count
         self.boss_secondary_delay = 15        # Secondary burst delay frames
+
+        # Crit particle burst (golden sparks)
+        self.crit_particle_count = 14
+        self.crit_particle_size_mult = 2.0
+        self.crit_particle_speed_mult = 2.0
+        self.crit_particle_lifetime_mult = 0.7
+        self.crit_particle_colors = [
+            (255, 255, 100), (255, 215, 0),
+            (255, 255, 200), (255, 240, 150),
+        ]
+        # Crit shockwave ring
+        self.crit_ring_max_radius = 38
+        self.crit_ring_lifetime = 15
+        self.crit_ring_color = (255, 240, 150)
 
         # Boss death animation
         self.boss_death_flash_frames = 90     # Death flash total frames

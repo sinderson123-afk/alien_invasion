@@ -108,6 +108,7 @@ class AlienInvasion:
         self.clover_push_frames = 0        # Clover push animation countdown
         self.firing = False                # Spacebar held for auto-fire
         self._fire_cooldown = 0            # Auto-fire frame timer
+        self._crit_rings = []               # Crit shockwave rings: {x,y,radius,life,max_life}
         self._update_available = None      # (version, url) when update found
         self.in_transition = False         # Level transition cinematic active
         self.transition_stage = ''         # 'rise', 'hover', 'exit', 'enter'
@@ -120,6 +121,8 @@ class AlienInvasion:
         self._font_small_bell = pygame.font.SysFont(None, 14)
         self._font_title_bell = pygame.font.SysFont(None, 36, bold=True)
         self._font_row_bell = pygame.font.SysFont(None, 20)
+        self._account_confirm = False       # Account-switch confirmation dialog open
+        self._account_confirm_rects = []    # (action, rect) for dialog buttons
 
         # Start background music (menu theme)
         self.sound.play_menu_bgm()
@@ -150,14 +153,17 @@ class AlienInvasion:
                 if self.in_transition:
                     self._update_transition()
                     self.particles.update()
+                    self._update_crit_rings()
                 elif self.game_over_frames > 0:
                     self.game_over_frames -= 1
                     self.particles.update()
+                    self._update_crit_rings()
                     if self.game_over_frames == 0:
                         self._return_to_menu()
                 elif self.ship_death_frames > 0:
                     self.ship_death_frames -= 1
                     self.particles.update()
+                    self._update_crit_rings()
                     if self.ship_death_frames == 0:
                         self.game_over_frames = self.settings.fail_banner_duration
                 elif self.clover_push_frames > 0:
@@ -180,6 +186,7 @@ class AlienInvasion:
                     self._check_gem_pickup()
                     self._spawn_meteor()
                     self.particles.update()
+                    self._update_crit_rings()
                 elif self.hit_cooldown > 0:
                     # Cooldown: update aliens (with flash animation), boss bullets and particles, no collision detection
                     self.aliens.update()
@@ -196,6 +203,7 @@ class AlienInvasion:
                     self._update_meteor_collisions(skip_ship=True)
                     self._spawn_meteor()
                     self.particles.update()
+                    self._update_crit_rings()
                     self.hit_cooldown -= 1
                     if self.hit_cooldown == 0:
                         # Flash ends: destroy the colliding alien (explode at collision pos, not current pos)
@@ -234,6 +242,7 @@ class AlienInvasion:
                     self._update_meteor_collisions(skip_ship=False)
                     self._spawn_meteor()
                     self.particles.update()
+                    self._update_crit_rings()
 
                     # Boss secondary explosion
                     if self._boss_secondary_burst is not None:
@@ -327,6 +336,29 @@ class AlienInvasion:
             if hasattr(self, 'notification_bell_rect') and \
                     self.notification_bell_rect.collidepoint(mouse_pos):
                 self.show_notifications = True
+                return
+
+            # Gear click (switch account)
+            if hasattr(self, 'gear_button_rect') and \
+                    self.gear_button_rect.collidepoint(mouse_pos):
+                if self.stats.player_data.is_authenticated():
+                    self._account_confirm = True
+                else:
+                    self._switch_account()
+                return
+
+            # Account-switch confirmation dialog
+            if self._account_confirm:
+                clicked_dialog = False
+                for action, rect in self._account_confirm_rects:
+                    if rect.collidepoint(mouse_pos):
+                        clicked_dialog = True
+                        self._account_confirm = False
+                        if action == 'yes':
+                            self._switch_account()
+                        break
+                if not clicked_dialog:
+                    self._account_confirm = False
                 return
 
             action = self.menu_system.handle_menu_click(mouse_pos)
@@ -459,6 +491,55 @@ class AlienInvasion:
         if random.random() < self._get_crit_chance():
             return True, self._get_crit_multiplier()
         return False, 1.0
+
+    def _draw_account_confirm(self):
+        """Draw account-switch confirmation dialog (prevents accidental logout)."""
+        screen_w = self.screen_rect.width
+        screen_h = self.screen_rect.height
+        panel_w, panel_h = 440, 170
+        panel = pygame.Surface((panel_w, panel_h))
+        panel.fill((35, 38, 58))
+        panel_rect = panel.get_rect(center=(screen_w // 2, screen_h // 2))
+        pygame.draw.rect(panel, (90, 90, 120), panel.get_rect(), 2)
+        self.screen.blit(panel, panel_rect)
+        px, py = panel_rect.topleft
+
+        font_title = self._font_title_bell
+        font_text = self._font_row_bell
+
+        username = self.stats.player_data.get_username() or 'Unknown'
+        title = font_title.render("Switch Account?", True, (255, 215, 0))
+        self.screen.blit(title, (px + panel_w // 2 - title.get_width() // 2, py + 20))
+
+        info = font_text.render(f"Current account: {username}", True, (200, 200, 220))
+        self.screen.blit(info, (px + panel_w // 2 - info.get_width() // 2, py + 62))
+
+        hint = font_text.render("You will need to log in again.", True, (150, 150, 170))
+        self.screen.blit(hint, (px + panel_w // 2 - hint.get_width() // 2, py + 88))
+
+        self._account_confirm_rects = []
+
+        btn_w, btn_h = 120, 40
+        yes_rect = pygame.Rect(px + 90, py + 112, btn_w, btn_h)
+        pygame.draw.rect(self.screen, (100, 200, 100), yes_rect, border_radius=8)
+        yes_txt = font_text.render("Yes", True, (20, 20, 20))
+        self.screen.blit(yes_txt, (yes_rect.centerx - yes_txt.get_width() // 2,
+                                   yes_rect.centery - yes_txt.get_height() // 2))
+        self._account_confirm_rects.append(('yes', yes_rect))
+
+        no_rect = pygame.Rect(px + 230, py + 112, btn_w, btn_h)
+        pygame.draw.rect(self.screen, (160, 70, 70), no_rect, border_radius=8)
+        no_txt = font_text.render("No", True, (255, 255, 255))
+        self.screen.blit(no_txt, (no_rect.centerx - no_txt.get_width() // 2,
+                                  no_rect.centery - no_txt.get_height() // 2))
+        self._account_confirm_rects.append(('no', no_rect))
+
+    def _switch_account(self):
+        """Log out current account and show the login overlay to switch accounts."""
+        self.stats.player_data.logout()
+        self.login_overlay = LoginOverlay(
+            self.screen, self.web_client, self.stats.player_data)
+        self.state = GameState.LOGIN
 
     def _quit_game(self):
         """Save high score and player data, then quit"""
@@ -953,7 +1034,10 @@ class AlienInvasion:
 
         # -------- MENU state --------
         elif self.state == GameState.MENU:
-            if self.show_notifications:
+            if self._account_confirm:
+                if event.key == pygame.K_ESCAPE:
+                    self._account_confirm = False
+            elif self.show_notifications:
                 if event.key == pygame.K_ESCAPE:
                     self.show_notifications = False
                 elif event.key == pygame.K_c:
@@ -1058,6 +1142,8 @@ class AlienInvasion:
                 is_crit, crit_mult = self._roll_crit()
                 if is_crit:
                     dmg *= crit_mult
+                    self._create_crit_burst(alien.rect.center)
+                    self.stats.crit_count += 1
                 total_damage += dmg
 
                 if pen_chance <= 0 or random.random() >= pen_chance:
@@ -1116,6 +1202,8 @@ class AlienInvasion:
                 is_crit, crit_mult = self._roll_crit()
                 if is_crit:
                     dmg *= crit_mult
+                    self._create_crit_burst(alien.rect.center)
+                    self.stats.crit_count += 1
                 if alien.take_damage(round(dmg, 2)):
                     self._create_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
@@ -1131,6 +1219,8 @@ class AlienInvasion:
                 is_crit, crit_mult = self._roll_crit()
                 if is_crit:
                     dmg *= crit_mult
+                    self._create_crit_burst(self.boss.rect.center)
+                    self.stats.crit_count += 1
                 if self.boss.take_damage(round(dmg, 2)):
                     self._create_explosion(self.boss.rect.center)
                     self._maybe_drop_coin(*self.boss.rect.center)
@@ -1544,6 +1634,28 @@ class AlienInvasion:
 
         return pygame.Rect(bell_x - bell_r, bell_y, bell_r * 2, bell_r * 2 + 15)
 
+    def _draw_account_gear(self):
+        """Draw gear button below notification bell (switch account)"""
+        gx = self.screen_rect.right - 55
+        gy = 88
+        r = 13
+        color = (165, 165, 175)
+
+        # Teeth (8 small circles around the gear)
+        for i in range(8):
+            angle = math.radians(i * 45)
+            tx = gx + int(math.cos(angle) * (r + 4))
+            ty = gy + int(math.sin(angle) * (r + 4))
+            pygame.draw.circle(self.screen, color, (tx, ty), 4)
+
+        # Gear body
+        pygame.draw.circle(self.screen, color, (gx, gy), r)
+        pygame.draw.circle(self.screen, (75, 75, 92), (gx, gy), r - 4)
+        # Center hole
+        pygame.draw.circle(self.screen, (215, 215, 225), (gx, gy), 4)
+
+        return pygame.Rect(gx - r - 6, gy - r - 6, (r + 6) * 2, (r + 6) * 2)
+
     def _draw_notifications_panel(self):
         """Draw notification panel overlay"""
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
@@ -1610,6 +1722,8 @@ class AlienInvasion:
                 is_crit, crit_mult = self._roll_crit()
                 if is_crit:
                     dmg *= crit_mult
+                    self._create_crit_burst(missile.rect.center)
+                    self.stats.crit_count += 1
                 if self.boss.take_damage(round(dmg, 2)):
                     self._create_explosion(self.boss.rect.center)
                     self._maybe_drop_coin(*self.boss.rect.center)
@@ -1632,6 +1746,8 @@ class AlienInvasion:
                 is_crit, crit_mult = self._roll_crit()
                 if is_crit:
                     dmg *= crit_mult
+                    self._create_crit_burst(bullet.rect.center)
+                    self.stats.crit_count += 1
                 if self.boss.take_damage(round(dmg, 2)):
                     self._create_explosion(self.boss.rect.center)
                     self._maybe_drop_coin(*self.boss.rect.center)
@@ -1972,6 +2088,48 @@ class AlienInvasion:
             particle = Particle(self, position[0], position[1])
             self.particles.add(particle)
 
+    def _create_crit_burst(self, position):
+        """Crit hit effect: golden spark particles + expanding shockwave ring."""
+        s = self.settings
+        for _ in range(s.crit_particle_count):
+            p = Particle(self, position[0], position[1],
+                         size_mult=s.crit_particle_size_mult,
+                         speed_mult=s.crit_particle_speed_mult,
+                         lifetime_mult=s.crit_particle_lifetime_mult,
+                         colors=s.crit_particle_colors)
+            self.particles.add(p)
+        self._crit_rings.append({
+            'x': int(position[0]), 'y': int(position[1]),
+            'radius': 4.0, 'life': s.crit_ring_lifetime,
+            'max_life': s.crit_ring_lifetime,
+        })
+
+    def _update_crit_rings(self):
+        """Grow radius and decay life of crit shockwave rings."""
+        s = self.settings
+        for ring in self._crit_rings[:]:
+            ring['life'] -= 1
+            prog = 1.0 - ring['life'] / ring['max_life']
+            ring['radius'] = 4.0 + (s.crit_ring_max_radius - 4.0) * prog
+            if ring['life'] <= 0:
+                self._crit_rings.remove(ring)
+
+    def _draw_crit_rings(self):
+        """Draw crit shockwave rings (fading golden outline)."""
+        s = self.settings
+        for ring in self._crit_rings:
+            ratio = ring['life'] / ring['max_life']
+            alpha = int(ratio * 220)
+            r = int(ring['radius'])
+            if r < 1 or alpha <= 0:
+                continue
+            size = r * 2 + 6
+            surf = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*s.crit_ring_color, alpha),
+                               (size // 2, size // 2), r, 2)
+            self.screen.blit(surf,
+                             (ring['x'] - size // 2, ring['y'] - size // 2))
+
     def _create_missile_explosion(self, position):
         """Create large explosion particles at missile impact"""
         s = self.settings
@@ -2183,6 +2341,7 @@ class AlienInvasion:
         self.meteors.draw(self.screen)
         self.meteor_fragments.draw(self.screen)
         self.particles.draw(self.screen)
+        self._draw_crit_rings()
 
         # Show score info
         self.sb.show_score()
@@ -2219,6 +2378,9 @@ class AlienInvasion:
             self.menu_system.draw_start_screen(
                 pygame.mouse.get_pos(), save_exists=save_exists)
             self.notification_bell_rect = self._draw_notification_bell()
+            self.gear_button_rect = self._draw_account_gear()
+            if self._account_confirm:
+                self._draw_account_confirm()
 
             # Update available banner
             if self._update_available is not None:

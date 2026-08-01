@@ -33,10 +33,15 @@ class PlayerData:
         data = decrypt_json(self.file_path)
         if data is None:
             return dict(_DEFAULTS)
+
+        skills = dict(_DEFAULTS['skills'])
+        skills.update(data.get('skills', {}))
+        items = dict(_DEFAULTS['items'])
+        items.update(data.get('items', {}))
         return {
             'coins': data.get('coins', 0),
-            'items': data.get('items', {'magnet': 0, 'shield': 0, 'clover': 0}),
-            'skills': data.get('skills', {'speed': 0, 'ammo': 0, 'vitality': 0}),
+            'items': items,
+            'skills': skills,
             'armor': data.get('armor', None),
             'equipped_gems': data.get('equipped_gems', [None] * 5),
             'gem_storage': data.get('gem_storage', []),
@@ -92,3 +97,19 @@ class PlayerData:
 
     def is_authenticated(self) -> bool:
         return bool(self.load()['token'])
+
+    def logout(self):
+        """Clear auth token/username/email (switch account)"""
+        existing = self.load()
+        data = {
+            'coins': existing['coins'],
+            'items': existing['items'],
+            'skills': existing['skills'],
+            'armor': existing['armor'],
+            'equipped_gems': existing.get('equipped_gems', [None] * 5),
+            'gem_storage': existing.get('gem_storage', []),
+            'token': '',
+            'username': '',
+            'email': '',
+        }
+        encrypt_json(data, self.file_path)
