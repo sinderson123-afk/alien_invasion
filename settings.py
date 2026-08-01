@@ -173,6 +173,15 @@ class Settings:
         self.boss_hp_bar_height = 5         # Boss HP bar height
         self.boss_hp_bar_offset_y = 12      # Boss HP bar vertical offset from top
 
+        # Boss summon & hostile missile (Moon/Space zone enhancement)
+        self.boss_summon_hp_ratio = 0.5     # Summon fleet below this HP fraction (Moon/Space)
+        self.boss_summon2_hp_ratio = 0.25   # Re-summon below this HP (Space only)
+        self.boss_missile_interval = 300    # Hostile missile every 5s (Space only)
+        self.boss_missile_speed = 2.5       # Slow tracking missile speed
+        self.boss_missile_turn_rate = 0.02  # Low tracking turn rate
+        self.boss_missile_damage = 8        # Hostile missile damage
+        self.boss_missile_radius = 5        # Hostile missile visual radius
+
         # Coin settings
         self.coin_drop_rate = 0.3           # Coin drop rate on alien kill
         self.coin_drop_rate_base = self.coin_drop_rate

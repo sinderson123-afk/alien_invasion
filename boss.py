@@ -49,6 +49,15 @@ class Boss(Sprite):
         self.death_timer = 0            # Death animation countdown
         self._death_exploded = False    # Whether explosion triggered (prevent duplicate)
 
+        # Summon / hostile missile state (Moon & Space zone enhancement)
+        self.summoned = False           # Half-HP fleet summon done
+        self.summoned2 = False          # Quarter-HP re-summon done (Space only)
+        self.missile_timer = self.settings.boss_missile_interval
+
+    def zone_index(self):
+        """Zone index: 0=Earth, 1=Moon, 2=Space (cycles every 30 levels)."""
+        return ((self.stats.level - 1) // 10) % 3
+
     def update(self):
         """Move horizontally and fire periodically (only flash during death)"""
         if self.dying:
@@ -64,6 +73,21 @@ class Boss(Sprite):
                 self.image.set_alpha(255)
         else:
             self.image.set_alpha(255)
+
+        # Summon fleet at half HP (Moon & Space)
+        if not self.summoned and self.hp <= self.max_hp * self.settings.boss_summon_hp_ratio \
+                and self.zone_index() in (1, 2):
+            self._summon()
+
+        # Re-summon + hostile missiles at quarter HP (Space only)
+        if self.zone_index() == 2:
+            if not self.summoned2 and self.hp <= self.max_hp * self.settings.boss_summon2_hp_ratio:
+                self._summon(second=True)
+            if self.summoned2:
+                self.missile_timer -= 1
+                if self.missile_timer <= 0:
+                    self._fire_missile()
+                    self.missile_timer = self.settings.boss_missile_interval
 
         # Horizontal movement
         speed = self.settings.alien_speed * self.settings.boss_speed_factor
@@ -81,6 +105,21 @@ class Boss(Sprite):
         if self.fire_timer <= 0:
             self._fire()
             self.fire_timer = self.settings.boss_fire_interval
+
+    def _summon(self, second=False):
+        """Summon an alien fleet to fight alongside the boss."""
+        if second:
+            self.summoned2 = True
+        else:
+            self.summoned = True
+        self.ai_game._summon_boss_fleet()
+        self.ai_game.sound.play_alarm()
+
+    def _fire_missile(self):
+        """Fire a hostile homing missile from bottom-center of boss."""
+        from boss_missile import BossMissile
+        self.ai_game.boss_missiles.add(
+            BossMissile(self.ai_game, self.rect.centerx, self.rect.bottom))
 
     def _update_death_animation(self):
         """Death animation: hover -> accelerated flash -> final explosion"""

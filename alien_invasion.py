@@ -17,6 +17,7 @@ from scoreboard import Scoreboard
 from sound import SoundManager
 from boss import Boss
 from boss_bullet import BossBullet
+from boss_missile import BossMissile
 from coin import Coin
 from gem import GemPickup, generate_gem, upgrade_gem, get_gem_bonuses, init_gem_id_counter
 from scrolling_background import ScrollingBackground
@@ -53,6 +54,7 @@ class AlienInvasion:
         self.aliens = pygame.sprite.Group()
         self.particles = pygame.sprite.Group()
         self.boss_bullets = pygame.sprite.Group()
+        self.boss_missiles = pygame.sprite.Group()
         self.coins = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
         self.meteors = pygame.sprite.Group()
@@ -191,6 +193,7 @@ class AlienInvasion:
                     # Cooldown: update aliens (with flash animation), boss bullets and particles, no collision detection
                     self.aliens.update()
                     self._update_boss_bullets()
+                    self._update_boss_missiles()
                     if self.boss is not None:
                         self.boss.update()
                     self.coins.update()
@@ -215,7 +218,8 @@ class AlienInvasion:
                             self._maybe_drop_coin(*explosion_pos)
                             self.flashing_alien.kill()
                             self.sound.play_explosion()
-                            self._award_points(1)
+                            self._award_points(
+                                1, kill_count=0 if getattr(self.flashing_alien, 'summoned', False) else 1)
                         self.flashing_alien = None
                         self.flashing_alien_pos = None
                 else:
@@ -229,6 +233,7 @@ class AlienInvasion:
                     self._update_bullets()
                     self._update_missiles()
                     self._update_boss_bullets()
+                    self._update_boss_missiles()
                     if self.boss is not None:
                         self.boss.update()
                     self._update_aliens()
@@ -578,6 +583,7 @@ class AlienInvasion:
         self.missiles.empty()
         self.aliens.empty()
         self.boss_bullets.empty()
+        self.boss_missiles.empty()
         self.meteors.empty()
         self.meteor_fragments.empty()
         self.meteor_timer = self.settings.meteor_spawn_interval
@@ -608,6 +614,7 @@ class AlienInvasion:
         self.missiles.empty()
         self.aliens.empty()
         self.boss_bullets.empty()
+        self.boss_missiles.empty()
         self.meteors.empty()
         self.meteor_fragments.empty()
         self.boss = None
@@ -639,7 +646,7 @@ class AlienInvasion:
                 flashing_alien_id = None
 
         data = {
-            'version': 5,  # Save format version
+            'version': 6,  # Save format version
             'stats': {
                 'score': self.stats.score,
                 'kills': self.stats.kills,
@@ -699,6 +706,7 @@ class AlienInvasion:
                 'bullets': [],
                 'missiles': [],
                 'boss_bullets': [],
+                'boss_missiles': [],
                 'coins': [],
                 'meteors': [],
                 'meteor_fragments': [],
@@ -730,6 +738,9 @@ class AlienInvasion:
                 'dying': b.dying,
                 'death_timer': b.death_timer,
                 '_death_exploded': b._death_exploded,
+                'summoned': b.summoned,
+                'summoned2': b.summoned2,
+                'missile_timer': b.missile_timer,
             }
 
         for bullet in self.bullets.sprites():
@@ -746,6 +757,12 @@ class AlienInvasion:
         for bb in self.boss_bullets.sprites():
             data['entities']['boss_bullets'].append({
                 'x': bb.rect.x, 'y': bb.y,
+            })
+
+        for bm in self.boss_missiles.sprites():
+            data['entities']['boss_missiles'].append({
+                'x': bm.x, 'y': bm.y,
+                'vx': bm.velocity.x, 'vy': bm.velocity.y,
             })
 
         for coin in self.coins.sprites():
@@ -809,7 +826,18 @@ class AlienInvasion:
             s.setdefault('gem_storage', [])
             data.setdefault('version', 5)
             save_ver = 5
-        # future v5 -> v6 appended here
+        if save_ver < 6:
+            # v5 -> v6: boss summon/missile state + boss_missiles entity list
+            e = data.setdefault('entities', {})
+            e.setdefault('boss_missiles', [])
+            b = e.get('boss')
+            if isinstance(b, dict):
+                b.setdefault('summoned', False)
+                b.setdefault('summoned2', False)
+                b.setdefault('missile_timer', 300)
+            data.setdefault('version', 6)
+            save_ver = 6
+        # future v6 -> v7 appended here
         return data
 
     def _resume_game(self):
@@ -892,6 +920,7 @@ class AlienInvasion:
         self.missiles.empty()
         self.aliens.empty()
         self.boss_bullets.empty()
+        self.boss_missiles.empty()
         self.coins.empty()
         self.meteors.empty()
         self.meteor_fragments.empty()
@@ -939,6 +968,9 @@ class AlienInvasion:
             boss.dying = b_data['dying']
             boss.death_timer = b_data['death_timer']
             boss._death_exploded = b_data['_death_exploded']
+            boss.summoned = b_data.get('summoned', False)
+            boss.summoned2 = b_data.get('summoned2', False)
+            boss.missile_timer = b_data.get('missile_timer', self.settings.boss_missile_interval)
             self.boss = boss
 
         # --- Rebuild bullets ---
@@ -967,6 +999,15 @@ class AlienInvasion:
             bb.y = b_data['y']
             bb.rect.y = int(bb.y)
             self.boss_bullets.add(bb)
+
+        # --- Rebuild boss missiles ---
+        for m_data in e.get('boss_missiles', []):
+            bm = BossMissile(self, m_data['x'], m_data['y'])
+            bm.x = m_data['x']
+            bm.y = m_data['y']
+            bm.velocity = pygame.math.Vector2(m_data['vx'], m_data['vy'])
+            bm.rect.center = (int(bm.x), int(bm.y))
+            self.boss_missiles.add(bm)
 
         # --- Rebuild coins ---
         for c_data in e['coins']:
@@ -1155,7 +1196,8 @@ class AlienInvasion:
                 self._maybe_drop_coin(*alien.rect.center)
                 self._maybe_drop_gem(*alien.rect.center)
                 self.sound.play_explosion()
-                self._award_points(1)
+                self._award_points(
+                    1, kill_count=0 if getattr(alien, 'summoned', False) else 1)
             else:
                 self.sound.play_hurt()
 
@@ -1181,6 +1223,15 @@ class AlienInvasion:
             if bullet.rect.top > self.settings.screen_height:
                 self.boss_bullets.remove(bullet)
 
+    def _update_boss_missiles(self):
+        """Update boss missile positions and remove off-screen"""
+        self.boss_missiles.update()
+        for missile in self.boss_missiles.copy():
+            if (missile.rect.top > self.settings.screen_height + 40
+                    or missile.rect.right < -40
+                    or missile.rect.left > self.settings.screen_width + 40):
+                self.boss_missiles.remove(missile)
+
     def _check_missile_alien_collisions(self):
         """Handle missile-alien collisions: AoE damage to aliens in blast radius"""
         collisions = pygame.sprite.groupcollide(self.missiles, self.aliens, True, False)
@@ -1196,6 +1247,7 @@ class AlienInvasion:
 
         blast_center = pygame.math.Vector2(center)
         destroyed = 0
+        summoned_destroyed = 0
         for alien in self.aliens.sprites():
             if blast_center.distance_to(alien.rect.center) <= self.settings.missile_blast_radius:
                 dmg = self.settings.missile_damage
@@ -1209,6 +1261,8 @@ class AlienInvasion:
                     self._maybe_drop_coin(*alien.rect.center)
                     self._maybe_drop_gem(*alien.rect.center)
                     destroyed += 1
+                    if getattr(alien, 'summoned', False):
+                        summoned_destroyed += 1
                     self.sound.play_explosion()
                 else:
                     self.sound.play_hurt()
@@ -1229,12 +1283,15 @@ class AlienInvasion:
                 else:
                     self.sound.play_hurt()
         if destroyed:
-            self._award_points(destroyed)
+            self._award_points(destroyed, kill_count=destroyed - summoned_destroyed)
 
-    def _award_points(self, alien_count):
-        """Award points by alien count and update displays"""
+    def _award_points(self, alien_count, kill_count=None):
+        """Award points by alien count and update displays.
+        kill_count: kills added to progression (summoned aliens award score but no kills)."""
         self.stats.score += self.settings.alien_points * alien_count
-        self.stats.kills += alien_count
+        if kill_count is None:
+            kill_count = alien_count
+        self.stats.kills += kill_count
         self.sb.prep_score()
         self.sb.check_high_score()
         self._check_missile_award()
@@ -1768,6 +1825,17 @@ class AlienInvasion:
                 self._ship_hit(self.settings.boss_bullet_damage)
                 break
 
+    def _check_boss_missile_ship_collisions(self):
+        """Check if boss missiles hit the ship"""
+        if self.ship.invulnerable_frames > 0:
+            return
+        for missile in self.boss_missiles.sprites():
+            if missile.rect.colliderect(self.ship.rect):
+                self.boss_missiles.remove(missile)
+                self._create_explosion(missile.rect.center)
+                self._ship_hit(self.settings.boss_missile_damage)
+                break
+
     def _check_fleet_cleared(self):
         """Start new wave after fleet (or boss) is eliminated"""
         if self.boss_warning_frames > 0:
@@ -1793,6 +1861,8 @@ class AlienInvasion:
                 self._check_level_up()
                 self.bullets.empty()
                 self.boss_bullets.empty()
+                self.boss_missiles.empty()
+                self.aliens.empty()  # Clear summoned fleet alongside boss
                 if self._maybe_switch_level_bgm():
                     return
                 self._create_fleet()
@@ -1848,6 +1918,19 @@ class AlienInvasion:
         new_alien.rect.x = x_position
         new_alien.rect.y = y_position
         self.aliens.add(new_alien)
+        return new_alien
+
+    def _summon_boss_fleet(self):
+        """Boss summon: scatter a full alien wave at the top (like a normal wave)."""
+        s = self.settings
+        alien = Alien(self)
+        alien_width = alien.rect.width
+        for _ in range(s.aliens_per_wave):
+            x_position = random.randint(0, s.screen_width - alien_width)
+            y_position = random.randint(s.alien_spawn_y_min, s.alien_spawn_y_max)
+            a = self._create_alien(x_position, y_position)
+            a.summoned = True  # Summoned aliens don't count toward level kills
+        self.dive_timer = s.alien_dive_cooldown
 
     def _activate_magnet(self):
         """Activate magnet item"""
@@ -1888,6 +1971,9 @@ class AlienInvasion:
         for bullet in self.boss_bullets.sprites():
             bullet.y -= push_speed
             bullet.rect.y = int(bullet.y)
+        for missile in self.boss_missiles.sprites():
+            missile.y -= push_speed
+            missile.rect.y = int(missile.y)
 
         self.clover_push_frames -= 1
         if self.clover_push_frames <= 0:
@@ -1907,6 +1993,9 @@ class AlienInvasion:
             for bullet in self.boss_bullets.sprites():
                 bullet.y = float(target_y)
                 bullet.rect.y = int(bullet.y)
+            for missile in self.boss_missiles.sprites():
+                missile.y = float(target_y)
+                missile.rect.y = int(missile.y)
 
     def _update_magnet(self):
         """Update magnet state: countdown + attract nearby coins"""
@@ -1998,7 +2087,8 @@ class AlienInvasion:
                     self._create_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
                     self.sound.play_explosion()
-                    self._award_points(1)
+                    self._award_points(
+                        1, kill_count=0 if getattr(alien, 'summoned', False) else 1)
                 else:
                     self.sound.play_hurt()
                 break  # Meteor destroyed, break inner loop
@@ -2014,7 +2104,8 @@ class AlienInvasion:
                     self._create_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
                     self.sound.play_explosion()
-                    self._award_points(1)
+                    self._award_points(
+                        1, kill_count=0 if getattr(alien, 'summoned', False) else 1)
                 else:
                     self.sound.play_hurt()
                 break
@@ -2239,6 +2330,7 @@ class AlienInvasion:
                 self.missiles.empty()
                 self.aliens.empty()
                 self.boss_bullets.empty()
+                self.boss_missiles.empty()
                 self._transition_flash_frames = s.transition_flash_frames
                 self._trans_trails.clear()
                 self._trans_streaks.clear()
@@ -2333,6 +2425,7 @@ class AlienInvasion:
         for alien in self.aliens.sprites():
             alien.draw_hp_bar()
         self.boss_bullets.draw(self.screen)
+        self.boss_missiles.draw(self.screen)
         if self.boss is not None:
             self.screen.blit(self.boss.image, self.boss.rect)
             self.boss.draw_hp_bar()
@@ -2441,6 +2534,9 @@ class AlienInvasion:
 
         # Check boss bullet-ship collisions
         self._check_boss_bullet_ship_collisions()
+
+        # Check boss missile-ship collisions
+        self._check_boss_missile_ship_collisions()
 
         # Check alien-ship collisions (not during invulnerability)
         if self.ship.invulnerable_frames == 0:
@@ -2563,12 +2659,17 @@ class AlienInvasion:
         if self.stats.ship_hp <= 0:
             self.stats.ship_hp = 0
             self._start_ship_death()
-        else:
-            self.ship.invulnerable_frames = self.settings.invulnerable_duration
+            return
 
-            self.bullets.empty()
-            self.missiles.empty()
-            self.aliens.empty()
+        self.ship.invulnerable_frames = self.settings.invulnerable_duration
+
+        self.bullets.empty()
+        self.missiles.empty()
+        self.aliens.empty()
+        if self.boss is not None:
+            # Boss fight: summoned fleet breached the line — clear it but keep the boss fight going
+            pass
+        else:
             self._create_fleet()
             self.ship.center_ship()
 if __name__ == "__main__":
