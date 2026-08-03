@@ -1,6 +1,6 @@
 """Gem management tab (rendered inside the shop panel)."""
 import pygame
-from gem import STAT_LABELS, STAT_FORMATS, COLORS, upgrade_gem, get_gem_bonuses
+from gem import ALL_STATS, STAT_LABELS, STAT_FORMATS, COLORS, upgrade_gem, get_gem_bonuses
 
 gem_tab_buttons = []
 
@@ -63,37 +63,66 @@ def draw_gem_tab(screen, stats, settings, panel_rect):
             screen.blit(empty_img, empty_rect)
             gem_tab_buttons.append(('equip_slot', i, 0, slot_rect))
 
-    # ── Section: Storage ──
+    # ── Section: Storage (grouped by main stat, sorted by level desc) ──
     storage_y = slot_y + 28 + slot_h + 16
     storage_title = font_title.render("Storage", True, white)
     screen.blit(storage_title, (px + 20, storage_y))
 
     storage_start_y = storage_y + 30
     item_h = 36
+    header_h = 20
     visible_count = 5
+    storage_area_h = visible_count * item_h
 
     if not isinstance(stats.gem_storage, list):
         stats.gem_storage = []
-    total = len(stats.gem_storage)
+
+    # Build display rows: ('header', stat_type) or ('gem', storage_idx, gem)
+    display_rows = []
+    for stat_type in ALL_STATS:
+        group = [(i, g) for i, g in enumerate(stats.gem_storage)
+                 if g and g['main_stat'][0] == stat_type]
+        if not group:
+            continue
+        display_rows.append(('header', stat_type))
+        group.sort(key=lambda x: x[1]['level'], reverse=True)
+        display_rows.extend(('gem', i, g) for i, g in group)
+
+    total_rows = len(display_rows)
 
     gem_tab_buttons.append(('storage_scroll_up', None, 0,
                              pygame.Rect(px + panel_w - 40, storage_start_y, 32, 22)))
     gem_tab_buttons.append(('storage_scroll_down', None, 0,
-                             pygame.Rect(px + panel_w - 40, storage_start_y + visible_count * item_h - 2, 32, 22)))
+                             pygame.Rect(px + panel_w - 40, storage_start_y + storage_area_h - 2, 32, 22)))
 
     scroll_offset = getattr(stats, '_gem_scroll', 0)
     if scroll_offset < 0:
         scroll_offset = 0
-    max_scroll = max(0, total - visible_count)
+    max_scroll = max(0, total_rows - visible_count)
     if scroll_offset > max_scroll:
         scroll_offset = max_scroll
     stats._gem_scroll = scroll_offset
 
     for j in range(visible_count):
-        idx = scroll_offset + j
+        row_idx = scroll_offset + j
+        if row_idx >= total_rows:
+            break
+        row = display_rows[row_idx]
         iy = storage_start_y + j * item_h
-        if idx < len(stats.gem_storage):
-            gem = stats.gem_storage[idx]
+
+        if row[0] == 'header':
+            # Group header row
+            stat_type = row[1]
+            color = COLORS.get(stat_type, (180, 180, 180))
+            count = sum(1 for g in stats.gem_storage
+                        if g and g['main_stat'][0] == stat_type)
+            hdr_rect = pygame.Rect(px + 20, iy, panel_w - 60, header_h)
+            pygame.draw.rect(screen, (22, 28, 46), hdr_rect, border_radius=4)
+            hdr = font_small.render(f"{STAT_LABELS[stat_type]}  ({count})", True, color)
+            screen.blit(hdr, (px + 26, iy + 2))
+        else:
+            # Gem row
+            _, idx, gem = row
             mst = gem['main_stat']
             color = COLORS.get(mst[0], (180, 180, 180))
             item_rect = pygame.Rect(px + 20, iy, panel_w - 60, item_h)
@@ -121,7 +150,7 @@ def draw_gem_tab(screen, stats, settings, panel_rect):
 
     down_color = white if scroll_offset < max_scroll else gray
     down_img = font_small.render("Dn", True, down_color)
-    screen.blit(down_img, (px + panel_w - 34, storage_start_y + visible_count * item_h - 2))
+    screen.blit(down_img, (px + panel_w - 34, storage_start_y + storage_area_h - 2))
 
     # ── Detail panel (right side of storage) ──
     detail_bottom = py + panel_rect.height - 40
@@ -132,7 +161,7 @@ def draw_gem_tab(screen, stats, settings, panel_rect):
         mst = gem['main_stat']
         color = COLORS.get(mst[0], (180, 180, 180))
 
-        detail_y = storage_start_y + visible_count * item_h + 8
+        detail_y = storage_start_y + storage_area_h + 8
 
         d_name = font_title.render(f"{gem['name']}  Lv.{gem['level']}", True, color)
         screen.blit(d_name, (px + 20, detail_y))

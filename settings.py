@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 
-GAME_VERSION = "1.4.1"
+GAME_VERSION = "1.5.0"
 
 try:
     from _build_info import DEV_BUILD as IS_DEV_BUILD
@@ -76,6 +76,12 @@ class Settings:
             (255, 100, 0),
             (255, 50, 0),
             (255, 255, 0),
+        ]
+        self.alien_particle_colors = [  # Alien death colors (blue/cyan, distinct from crit gold)
+            (80, 160, 255),
+            (50, 200, 255),
+            (120, 220, 255),
+            (200, 240, 255),
         ]
 
         # Missile impact particles (larger and brighter than normal)

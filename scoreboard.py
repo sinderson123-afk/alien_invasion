@@ -36,26 +36,37 @@ class Scoreboard:
         self.prep_coins()
 
     def prep_score(self):
-        """Render score as image"""
-        score_str = f"{self.stats.score:,}"
-        self.score_image = self.font.render(score_str, True,
-                                            self.text_color, self.settings.bg_color)
+        """Render score as a tech panel (top-right)"""
+        self.score_image = self._build_stat_panel(
+            "SCORE", f"{self.stats.score:,}", (255, 255, 255))
 
-        # Show score at top-right of screen
         self.score_rect = self.score_image.get_rect()
         self.score_rect.right = self.screen_rect.right - 20
         self.score_rect.top = 20
 
     def prep_high_score(self):
-        """Render high score as image"""
-        high_score_str = f"{self.stats.high_score:,}"
-        self.high_score_image = self.font.render(high_score_str, True,
-                                                  self.text_color, self.settings.bg_color)
+        """Render high score as a tech panel (top-center)"""
+        self.high_score_image = self._build_stat_panel(
+            "BEST", f"{self.stats.high_score:,}", (255, 215, 0))
 
-        # Place high score at top-center of screen
         self.high_score_rect = self.high_score_image.get_rect()
         self.high_score_rect.centerx = self.screen_rect.centerx
         self.high_score_rect.top = self.score_rect.top
+
+    def _build_stat_panel(self, label, value, value_color, value_font=None):
+        """Build a tech HUD panel: small label on top, value below."""
+        font_label = pygame.font.SysFont(None, 16)
+        if value_font is None:
+            value_font = pygame.font.SysFont(None, 40)
+        lbl = font_label.render(label, True, (90, 205, 255))
+        val = value_font.render(value, True, value_color)
+        pad_x, pad_y = 14, 8
+        w = max(lbl.get_width(), val.get_width()) + pad_x * 2
+        h = lbl.get_height() + val.get_height() + pad_y * 2 + 4
+        panel = self._build_tech_panel_surface(w, h)
+        panel.blit(lbl, ((w - lbl.get_width()) // 2, pad_y - 1))
+        panel.blit(val, ((w - val.get_width()) // 2, pad_y + lbl.get_height() + 1))
+        return panel
 
     def prep_missiles(self):
         """Render missile stock as icon + count (below HP bar)"""
@@ -64,7 +75,7 @@ class Scoreboard:
 
         count_str = f"x {self.stats.missiles}"
         self.missile_count_image = self.small_font.render(count_str, True,
-                                                           self.text_color)
+                                                           (255, 255, 255))
         self.missile_count_rect = self.missile_count_image.get_rect()
         self.missile_count_rect.midleft = (self.missile_icon_rect.right + 8,
                                             self.missile_icon_rect.centery)
@@ -77,14 +88,14 @@ class Scoreboard:
         self.coins_rect.topleft = (16, 86)
 
     def prep_level(self):
-        """Render level as image"""
+        """Render level as a tech panel (below score)"""
         self.last_displayed_level = self.stats.level
-        level_str = f"Level {self.stats.level}"
-        self.level_image = self.small_font.render(level_str, True,
-                                                    self.text_color, self.settings.bg_color)
+        self.level_image = self._build_stat_panel(
+            "LEVEL", f"{self.stats.level}", (120, 220, 255),
+            value_font=pygame.font.SysFont(None, 30))
         self.level_rect = self.level_image.get_rect()
         self.level_rect.right = self.screen_rect.right - 20
-        self.level_rect.top = self.score_rect.bottom + 5
+        self.level_rect.top = self.score_rect.bottom + 6
 
     def _build_tech_panel_surface(self, w, h):
         """Build a layered tech HUD panel surface (dark base, highlight, cyan border, corner ticks)."""

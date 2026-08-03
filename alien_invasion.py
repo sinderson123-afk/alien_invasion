@@ -214,7 +214,7 @@ class AlienInvasion:
                             explosion_pos = (self.flashing_alien_pos
                                              if self.flashing_alien_pos
                                              else self.flashing_alien.rect.center)
-                            self._create_explosion(explosion_pos)
+                            self._create_alien_explosion(explosion_pos)
                             self._maybe_drop_coin(*explosion_pos)
                             self.flashing_alien.kill()
                             self.sound.play_explosion()
@@ -563,6 +563,8 @@ class AlienInvasion:
         self.settings.initialize_dynamic_settings()
         self.stats.reset_stats()
         self._apply_skills()
+        # Gem HP bonus raises max_hp after reset_stats — start at full HP
+        self.stats.ship_hp = self.stats.max_hp
         self.hit_cooldown = 0
         self.flashing_alien = None
         self.flashing_alien_pos = None
@@ -1192,7 +1194,7 @@ class AlienInvasion:
                         self.bullets.remove(bullet)
 
             if alien.take_damage(round(total_damage, 2)):
-                self._create_explosion(alien.rect.center)
+                self._create_alien_explosion(alien.rect.center)
                 self._maybe_drop_coin(*alien.rect.center)
                 self._maybe_drop_gem(*alien.rect.center)
                 self.sound.play_explosion()
@@ -1257,7 +1259,7 @@ class AlienInvasion:
                     self._create_crit_burst(alien.rect.center)
                     self.stats.crit_count += 1
                 if alien.take_damage(round(dmg, 2)):
-                    self._create_explosion(alien.rect.center)
+                    self._create_alien_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
                     self._maybe_drop_gem(*alien.rect.center)
                     destroyed += 1
@@ -2084,7 +2086,7 @@ class AlienInvasion:
             for alien in collisions:
                 self._meteor_break(meteor)
                 if alien.take_damage(s.meteor_alien_damage):
-                    self._create_explosion(alien.rect.center)
+                    self._create_alien_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
                     self.sound.play_explosion()
                     self._award_points(
@@ -2101,7 +2103,7 @@ class AlienInvasion:
             for alien in collisions:
                 frag.kill()
                 if alien.take_damage(s.meteor_fragment_damage):
-                    self._create_explosion(alien.rect.center)
+                    self._create_alien_explosion(alien.rect.center)
                     self._maybe_drop_coin(*alien.rect.center)
                     self.sound.play_explosion()
                     self._award_points(
@@ -2177,6 +2179,13 @@ class AlienInvasion:
         """Create explosion particles at position (for bullet kills)"""
         for _ in range(self.settings.particle_count):
             particle = Particle(self, position[0], position[1])
+            self.particles.add(particle)
+
+    def _create_alien_explosion(self, position):
+        """Create blue/cyan explosion particles for alien deaths (distinct from crit gold)."""
+        for _ in range(self.settings.particle_count):
+            particle = Particle(self, position[0], position[1],
+                                colors=self.settings.alien_particle_colors)
             self.particles.add(particle)
 
     def _create_crit_burst(self, position):
