@@ -1,0 +1,2 @@
+# Deployment scripts are uploaded from Windows and executed by /bin/sh on Linux.
+*.sh text eol=lf
