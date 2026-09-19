@@ -109,6 +109,7 @@ class AlienInvasion:
         self.clover_flash_frames = 0       # Clover screen flash countdown
         self.clover_push_frames = 0        # Clover push animation countdown
         self.firing = False                # Spacebar held for auto-fire
+        self.mouse_firing = False          # Visible mouse toggle, same firing cooldown.
         self._fire_cooldown = 0            # Auto-fire frame timer
         self._crit_rings = []               # Crit shockwave rings: {x,y,radius,life,max_life}
         self._update_available = None      # (version, url) when update found
@@ -171,7 +172,7 @@ class AlienInvasion:
                 elif self.clover_push_frames > 0:
                     self._update_clover_push()
                     self.ship.update()
-                    if self.firing:
+                    if self.firing or self.mouse_firing:
                         if self._fire_cooldown > 0:
                             self._fire_cooldown -= 1
                         else:
@@ -224,7 +225,7 @@ class AlienInvasion:
                         self.flashing_alien_pos = None
                 else:
                     self.ship.update()
-                    if self.firing:
+                    if self.firing or self.mouse_firing:
                         if self._fire_cooldown > 0:
                             self._fire_cooldown -= 1
                         else:
@@ -299,6 +300,8 @@ class AlienInvasion:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self._quit_game()
+            if event.type == pygame.WINDOWFOCUSLOST:
+                self._clear_controls()
 
             # Menu theme track ended → play next
             if event.type == self.sound.MUSIC_END_EVENT:
@@ -319,11 +322,24 @@ class AlienInvasion:
             elif event.type == pygame.KEYUP:
                 self._check_keyup_events(event)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_pos = pygame.mouse.get_pos()
-                self._check_mouse_click(mouse_pos)
+                if event.button == 1:
+                    self._check_mouse_click(event.pos)
 
     def _check_mouse_click(self, mouse_pos):
         """Route mouse clicks by current state"""
+        if self.state == GameState.PLAYING:
+            if self.ship_death_frames > 0 or self.game_over_frames > 0 or self.in_transition:
+                return
+            for label, key, rect in self._mouse_controls():
+                if rect.collidepoint(mouse_pos):
+                    if key == pygame.K_SPACE:
+                        self.mouse_firing = not self.mouse_firing
+                    else:
+                        self._check_keydown_events(pygame.event.Event(pygame.KEYDOWN, key=key))
+                    return
+            self.ship.moving_left = self.ship.moving_right = False
+            self.ship.target_x = mouse_pos[0]
+            return
         # When notification panel is open: click anywhere to close
         if self.show_notifications:
             self.show_notifications = False
@@ -427,7 +443,27 @@ class AlienInvasion:
         elif self.state == GameState.LEADERBOARD:
             self.state = GameState.MENU
 
-        # Mouse clicks ignored in PLAYING state
+    def _clear_controls(self):
+        self.ship.moving_left = self.ship.moving_right = False
+        self.ship.target_x = None
+        self.firing = self.mouse_firing = False
+
+    def _mouse_controls(self):
+        """Public controls use the same action handlers as the keyboard."""
+        actions = [('Fire: ON' if self.mouse_firing else 'Fire: OFF', pygame.K_SPACE),
+                   ('Missile', pygame.K_e), ('Magnet', pygame.K_n),
+                   ('Clover', pygame.K_c), ('Shop', pygame.K_m), ('Pause', pygame.K_ESCAPE)]
+        left = self.screen_rect.centerx - 306
+        return [(label, key, pygame.Rect(left + i * 103, 112, 100, 30))
+                for i, (label, key) in enumerate(actions)]
+
+    def _draw_mouse_controls(self):
+        for label, key, rect in self._mouse_controls():
+            color = (35, 110, 65) if key == pygame.K_SPACE and self.mouse_firing else (25, 42, 66)
+            pygame.draw.rect(self.screen, color, rect, border_radius=5)
+            pygame.draw.rect(self.screen, (90, 170, 205), rect, 1, border_radius=5)
+            text = self._font_row_bell.render(label, True, (235, 240, 250))
+            self.screen.blit(text, text.get_rect(center=rect.center))
 
     def _apply_skills(self):
         """Adjust game settings by skill levels (called after initialize_dynamic_settings)"""
@@ -555,6 +591,7 @@ class AlienInvasion:
 
     def _start_new_game(self):
         """Start new game: reset all game state and switch to PLAYING"""
+        self._clear_controls()
         # Delete old save
         save_path = Path(self.settings.save_file)
         if save_path.exists():
@@ -608,6 +645,7 @@ class AlienInvasion:
 
     def _return_to_menu(self):
         """Return to main menu: save data, clean entities, switch state"""
+        self._clear_controls()
         self._upload_current_stats()
         self.stats.save_high_score()
         self.stats.score = 0
@@ -844,6 +882,7 @@ class AlienInvasion:
 
     def _resume_game(self):
         """Load game state from encrypted file and resume"""
+        self._clear_controls()
         path = Path(self.settings.save_file)
         data = decrypt_json(path)
         if data is None:
@@ -1097,6 +1136,7 @@ class AlienInvasion:
                 return
             if event.key == pygame.K_ESCAPE:
                 # Pause and clear movement flags
+                self._clear_controls()
                 self.ship.moving_right = False
                 self.ship.moving_left = False
                 self.firing = False
@@ -1105,8 +1145,10 @@ class AlienInvasion:
                 self.state = GameState.PAUSED
                 self.sound.set_bgm_volume(self.settings.bgm_pause_volume)
             elif event.key == pygame.K_RIGHT:
+                self.ship.target_x = None
                 self.ship.moving_right = True
             elif event.key == pygame.K_LEFT:
+                self.ship.target_x = None
                 self.ship.moving_left = True
             elif event.key == pygame.K_SPACE:
                 self.firing = True
@@ -1114,6 +1156,7 @@ class AlienInvasion:
             elif event.key == pygame.K_e:
                 self._fire_missile()
             elif event.key == pygame.K_m:
+                self._clear_controls()
                 self.previous_state = GameState.PLAYING
                 self.state = GameState.SHOP
             elif event.key == pygame.K_n:
@@ -2277,6 +2320,7 @@ class AlienInvasion:
 
     def _start_transition(self):
         """Begin the level-transition cinematic."""
+        self._clear_controls()
         self.in_transition = True
         self.transition_stage = 'rise'
         self.transition_frames = self.settings.transition_rise_frames
@@ -2500,6 +2544,8 @@ class AlienInvasion:
 
         elif self.state in (GameState.PLAYING, GameState.PAUSED):
             self._draw_game_scene()
+            if self.state == GameState.PLAYING:
+                self._draw_mouse_controls()
             if self.state == GameState.PAUSED:
                 self.menu_system.draw_pause_overlay(
                     pygame.mouse.get_pos(), save_disabled=self.save_disabled)

@@ -87,9 +87,22 @@ class WebClient:
     # ------------------------------------------------------------------
     # Auth: send verification code
     # ------------------------------------------------------------------
+    def _auth_post(self, endpoint, data):
+        """Preserve API validation errors instead of reporting a network outage."""
+        try:
+            return self._post(endpoint, data)
+        except HTTPError as exc:
+            try:
+                result = json.loads(exc.read().decode())
+                if isinstance(result, dict) and isinstance(result.get('error'), str):
+                    return result
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                pass
+            return {'error': f'Server returned HTTP {exc.code}; please try again later'}
+
     def send_code(self, email: str, purpose: str = 'register') -> dict:
         """Send email verification code, returns {success, message} or {error}"""
-        return self._post('/api/auth/send-code', {
+        return self._auth_post('/api/auth/send-code', {
             'email': email.strip().lower(),
             'purpose': purpose,
         })
@@ -100,7 +113,7 @@ class WebClient:
     def register(self, email: str, code: str, username: str,
                  password: str) -> dict:
         """Register new account, returns {token, username, email} or {error}"""
-        return self._post('/api/auth/register', {
+        return self._auth_post('/api/auth/register', {
             'email': email.strip().lower(),
             'code': code.strip(),
             'username': username.strip(),
@@ -112,7 +125,7 @@ class WebClient:
     # ------------------------------------------------------------------
     def login(self, identifier: str, password: str) -> dict:
         """Login (username or email), returns {token, username, email} or {error}"""
-        return self._post('/api/auth/login', {
+        return self._auth_post('/api/auth/login', {
             'identifier': identifier.strip(),
             'password': password,
         })
@@ -123,7 +136,7 @@ class WebClient:
     def reset_password(self, email: str, code: str,
                        new_password: str) -> dict:
         """Reset password, returns {success, message} or {error}"""
-        return self._post('/api/auth/reset-password', {
+        return self._auth_post('/api/auth/reset-password', {
             'email': email.strip().lower(),
             'code': code.strip(),
             'new_password': new_password,

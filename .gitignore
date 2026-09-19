@@ -7,3 +7,7 @@ build/
 build_temp/
 icon.ico
 .idea/
+web/.env
+web/*.sqlite3*
+web/*export*.json
+web/.venv/

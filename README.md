@@ -6,22 +6,19 @@
 
 ## 架构
 
+```text
+桌面客户端 ── HTTPS ── logan-ai.org（la-vps）
+                            │
+                          Nginx
+                            │
+                      Flask + Gunicorn
+                       ├─ SQLite：账号、验证码、排行榜
+                       ├─ Redis：请求限流
+                       ├─ Resend：验证码邮件
+                       └─ 网页：排行榜、GitHub Releases 下载
 ```
-桌面客户端 (Windows EXE)          云端 (Google Cloud Run)
-┌──────────────────────┐         ┌─────────────────────────────┐
-│ Pygame 游戏引擎       │  HTTP   │ Flask + gunicorn             │
-│ ├─ 外星人/Boss/陨石   │ ◄────→ │ ├─ /api/auth/*  (邮箱验证码)  │
-│ ├─ 商店/技能树       │  POST   │ ├─ /api/stats   (战绩上传)    │
-│ ├─ 进度存档 (F5)     │  GET    │ ├─ /api/leaderboard (排行榜)  │
-│ ├─ 注册/登录/重置密码 │         │ └─ index.html  (前端展板)     │
-│ └─ 排行榜查询        │         │                ↕ Firestore    │
-└──────────────────────┘         └─────────────────────────────┘
-         │ 下载                         Cloudflare Pages
-         ▼                         ┌──────────────────┐
-  GitHub Releases                  │ logan-ai.org     │
-  AlienInvasion.exe                │ 排行榜 + 下载按钮 │
-                                   └──────────────────┘
-```
+
+已于 2026-09-19 完成 la-vps 数据迁移、TLS 和域名切换；旧 Cloud Run 地址保留兼容转发，详见部署文档。
 
 ---
 
@@ -34,6 +31,8 @@ python alien_invasion.py
 
 > 首次启动弹出邮箱注册/登录界面。已认证用户跳过。  
 > 游戏中按 **ESC** → Save Game 进度存档。主菜单 Resume Game 继续。
+
+键盘不可用时，可点击战场指定飞船的横向目标位置（按原速度移动），点击顶部 **Fire** 切换持续射击；Missile / Magnet / Clover / Shop / Pause 按钮对应原键盘动作。射速、弹药限制和道具消耗不变。暂停、失去窗口焦点和返回菜单会停止输入；教程页点击任意位置返回。登录输入支持 IME 提交的文本。
 
 ---
 
@@ -51,16 +50,9 @@ python -m PyInstaller AlienInvasion.spec --clean --noconfirm
 
 ## 服务端部署
 
-```bash
-cd web
-gcloud builds submit --tag gcr.io/YOUR_PROJECT/alien-invasion
-gcloud run deploy alien-invasion --image gcr.io/YOUR_PROJECT/alien-invasion \
-  --platform managed --region asia-east1 --memory 1Gi \
-  --set-env-vars="RESEND_API_KEY=re_xxxxxxxx" \
-  --allow-unauthenticated
-```
+服务端迁往 la-vps：Nginx + Gunicorn + SQLite + Redis，保留 logan-ai.org。
 
-需在 GCP 启用 Firestore（Native 模式）。
+安装步骤、数据迁移、TLS、备份和切换状态见 [web/DEPLOYMENT.md](web/DEPLOYMENT.md)。
 
 ---
 
@@ -100,7 +92,7 @@ alien_invasion/
 │   ├── images/                # 6 个 (飞船/外星人/Boss/3 背景/封面)
 │   └── sounds/                # 12 个音效 + 1 个 BGM
 │
-├── web/                       # Cloud Run 服务端
+├── web/                       # la-vps 网站与 API 服务端
 │   ├── server.py              # Flask API (530 行)
 │   ├── index.html             # 前端展板 (玻璃拟态仪表盘)
 │   ├── requirements.txt       # 服务端依赖

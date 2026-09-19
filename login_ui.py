@@ -129,17 +129,11 @@ class LoginOverlay:
             return False
         if event.type == pygame.KEYDOWN:
             return self._handle_key(event)
+        elif event.type == pygame.TEXTINPUT:
+            return self._insert_text(event.text)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             return self._handle_click(event.pos)
         return False
-
-    # US keyboard Shift map (fixes unicode issue from stop_text_input)
-    _US_SHIFT_MAP = {
-        '`': '~', '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
-        '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
-        '-': '_', '=': '+', '[': '{', ']': '}', '\\': '|',
-        ';': ':', "'": '"', ',': '<', '.': '>', '/': '?',
-    }
 
     def _handle_key(self, event):
         labels = self._field_labels
@@ -154,8 +148,7 @@ class LoginOverlay:
                     clip = subprocess.check_output(
                         ['powershell', '-command', 'Get-Clipboard'],
                         text=True, stderr=subprocess.DEVNULL).rstrip('\r\n')
-                    if clip:
-                        self._fields[self._active_field] += clip[:100]
+                    self._insert_text(clip)
                 except Exception:
                     pass
             return True
@@ -183,38 +176,27 @@ class LoginOverlay:
             return False
 
         idx = self._active_field
-        label = labels[idx]
-        is_code = 'Code' in label
-        is_email = 'Email' in label
-        max_len = self._field_max_len[idx]
-
         if event.key == pygame.K_BACKSPACE:
             self._fields[idx] = self._fields[idx][:-1]
             self._cursor_timer = 0
             return True
 
-        if not event.unicode or not event.unicode.isprintable():
+        # Printable text arrives through TEXTINPUT (IME, keyboard layout,
+        # and accessibility input). Consuming KEYDOWN.unicode too duplicates it.
+        return False
+
+    def _insert_text(self, text):
+        idx = self._active_field
+        if idx >= len(self._field_labels):
             return False
-
-        ch = event.unicode
-        shift = event.mod & pygame.KMOD_SHIFT
-
-        # Shift fix: stop_text_input causes unicode to not reflect Shift state
-        if shift and len(ch) == 1 and ch in self._US_SHIFT_MAP:
-            ch = self._US_SHIFT_MAP[ch]
-
-        # Character filter
-        if is_email:
-            pass
-        elif is_code:
-            if not ch.isdigit():
-                return True
-        elif ch == ' ':
-            return True
-
-        current = self._fields[idx]
-        if len(current) < max_len:
-            self._fields[idx] += ch
+        label = self._field_labels[idx]
+        text = ''.join(ch for ch in text if ch.isprintable())
+        if 'Code' in label:
+            text = ''.join(ch for ch in text if ch in '0123456789')
+        elif 'Email' not in label:
+            text = text.replace(' ', '')
+        remaining = max(0, self._field_max_len[idx] - len(self._fields[idx]))
+        self._fields[idx] += text[:remaining]
         self._cursor_timer = 0
         return True
 

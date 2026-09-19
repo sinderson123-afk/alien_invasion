@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up Alien Invasion database
+
+[Service]
+Type=oneshot
+User=alien-invasion
+EnvironmentFile=/etc/alien-invasion.env
+ExecStart=/opt/alien-invasion/venv/bin/python /opt/alien-invasion/web/backup.py
+UMask=0077

@@ -1,4 +1,4 @@
-const SERVER_URL = "https://alien-invasion-1018096304579.asia-east1.run.app";
+const SERVER_URL = window.location.origin;
 let pollInterval = null;
 
 const MIRRORS = [
@@ -197,11 +197,6 @@ export function initLeaderboard() {
         '<div class="leaderboard-empty" style="color: #ef4444;">Could not connect to server. Please try again later.</div>';
     }
 
-    try {
-      const resp = await fetch(`${SERVER_URL}/api/stats`);
-      const data = await resp.json();
-      renderStats(data);
-    } catch (e) {}
   }
 
   if (lbRefreshBtn) {

@@ -327,12 +327,12 @@ class MenuSystem:
             self.screen.blit(tip_img, tip_rect)
             row_y += 30
 
-        hint = self.hint_font.render("Press ESC to Return", True, (140, 140, 160))
+        hint = self.hint_font.render("Click anywhere / ESC to return | In game: click to move, Fire to toggle shooting", True, (180, 200, 220))
         hint_rect = hint.get_rect()
         hint_rect.centerx = self.screen_rect.centerx
         hint_rect.bottom = self.screen_rect.bottom - 20
         self.screen.blit(hint, hint_rect)
 
     def handle_tutorial_click(self, mouse_pos):
-        """No buttons on tutorial screen — ESC only."""
-        return None
+        """Mouse users can leave the tutorial without a keyboard."""
+        return 'back'

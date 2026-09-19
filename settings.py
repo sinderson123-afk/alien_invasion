@@ -339,7 +339,7 @@ class Settings:
         self.high_score_file = str(self._saves_dir / "high_score.dat")
 
         # --- Server settings ---
-        self.server_url = "https://alien-invasion-1018096304579.asia-east1.run.app"
+        self.server_url = "https://logan-ai.org"
 
         self.initialize_dynamic_settings()
 

@@ -1,8 +1,8 @@
 """Alien Invasion 云端服务器 — 邮箱验证码认证 + 排行榜 + 数据持久化
-Cloud Run 部署触发推送
-谷歌云部署（Cloud Run）：
+la-vps 部署：参见 DEPLOYMENT.md
+生产运行：
     gunicorn -w 2 -b 0.0.0.0:$PORT server:app
-本地开发（需 Firestore 仿真器或服务账号密钥）：
+本地开发（设置 DATABASE_PATH 为可写路径）：
     python server.py
 """
 
@@ -16,11 +16,12 @@ from datetime import timezone
 
 import bcrypt
 import requests
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, g
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from google.cloud import firestore
+from werkzeug.middleware.proxy_fix import ProxyFix
+import storage as firestore
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -29,7 +30,7 @@ _BASE_DIR = Path(__file__).parent.resolve()
 os.chdir(_BASE_DIR)
 
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
-RESEND_FROM = "Alien Invasion <onboarding@resend.dev>"
+RESEND_FROM = os.environ.get('RESEND_FROM', 'Alien Invasion <noreply@mail.logan-ai.org>')
 CODE_EXPIRE_SECONDS = 600  # 10 分钟
 CODE_MAX_ATTEMPTS = 3
 
@@ -41,17 +42,46 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
 )
 
-app = Flask(__name__, static_folder=str(_BASE_DIR), static_url_path='')
+app = Flask(__name__, static_folder=None)
+if os.environ.get('TRUST_PROXY') == '1':
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 CORS(app)
 
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["200 per minute"],
-    storage_uri="memory://",
+    storage_uri=os.environ.get('RATELIMIT_STORAGE_URI', 'memory://'),
 )
 
 db = firestore.Client()
+
+
+@app.before_request
+def begin_write():
+    if request.method == 'POST' and request.path.startswith('/api/'):
+        g.write_transaction = db.transaction()
+        g.write_transaction.__enter__()
+
+
+@app.after_request
+def finish_write(response):
+    transaction = g.pop('write_transaction', None)
+    if transaction is not None:
+        if response.status_code >= 500:
+            error = RuntimeError('Request failed')
+            transaction.__exit__(type(error), error, None)
+        else:
+            transaction.__exit__(None, None, None)
+    return response
+
+
+@app.teardown_request
+def rollback_write(error):
+    transaction = g.pop('write_transaction', None)
+    if transaction is not None:
+        error = error or RuntimeError('Request interrupted')
+        transaction.__exit__(type(error), error, error.__traceback__)
 
 # ---------------------------------------------------------------------------
 # 跨域隔离头
@@ -498,6 +528,8 @@ def get_leaderboard():
 # ---------------------------------------------------------------------------
 @app.route('/health')
 def health():
+    with db.connection() as conn:
+        conn.execute('SELECT 1 FROM documents LIMIT 1')
     return 'ok', 200
 
 
@@ -516,6 +548,8 @@ def index():
 @app.route('/<path:path>')
 def static_files(path):
     if '..' in path or path.startswith('/'):
+        return '', 404
+    if path not in ('index.html', 'version.json') and not path.startswith('static/'):
         return '', 404
     ext = Path(path).suffix.lower()
     if ext not in SAFE_EXTENSIONS and path != 'index.html':

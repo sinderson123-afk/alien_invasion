@@ -14,7 +14,7 @@ There is no root `requirements.txt` — only `web/requirements.txt` for the serv
 - **Single-file entrypoint**: `alien_invasion.py` (~2000 lines). All game logic lives in this file.
 - **Flat module layout**: every `.py` is a top-level module. No packages, no `setup.py`.
 - **State machine**: `GameState` enum in `game_stats.py` drives all event routing (7 states: `LOGIN → MENU → PLAYING ⇄ PAUSED ⇄ SHOP`, + `TUTORIAL`, `LEADERBOARD`).
-- **`web/` is a separate app**: Flask + Firestore backend, deployed on Cloud Run. Not part of the desktop game.
+- **`web/` is a separate app**: Flask + SQLite backend on `la-vps`, behind Nginx with Redis rate limiting. Cloud Run only proxies legacy client URLs. See `web/DEPLOYMENT.md`; not part of the desktop game.
 - **`resource/`**: images (sprites), sounds (audio), videos (menu background — gitignored).
 
 ## Build & release

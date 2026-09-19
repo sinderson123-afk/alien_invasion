@@ -27,12 +27,20 @@ class Ship:
         # Movement flags
         self.moving_right = False
         self.moving_left = False
+        self.target_x = None  # Mouse destination; obeys the same speed as arrow keys.
 
         # Hit flash timer (frames)
         self.invulnerable_frames = 0
 
     def update(self):
         """Update ship position by movement flags"""
+        if self.target_x is not None:
+            destination = max(0, min(self.screen_rect.width - self.rect.width,
+                                     self.target_x - self.rect.width / 2))
+            delta = destination - self.x
+            self.x += max(-self.settings.ship_speed, min(self.settings.ship_speed, delta))
+            if abs(delta) <= self.settings.ship_speed:
+                self.target_x = None
         if self.moving_right and self.rect.right < self.screen_rect.right:
             self.x += self.settings.ship_speed
         if self.moving_left and self.rect.left > 0:
@@ -52,5 +60,6 @@ class Ship:
 
     def center_ship(self):
         """Place ship centered at screen bottom"""
+        self.target_x = None
         self.rect.midbottom = self.screen_rect.midbottom
         self.x = float(self.rect.x)

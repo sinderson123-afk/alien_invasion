@@ -1,0 +1,23 @@
+[Unit]
+Description=Alien Invasion web API
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+User=alien-invasion
+Group=alien-invasion
+WorkingDirectory=/opt/alien-invasion/web
+EnvironmentFile=/etc/alien-invasion.env
+ExecStart=/opt/alien-invasion/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8080 --access-logfile - --error-logfile - server:app
+Restart=on-failure
+RestartSec=3
+StateDirectory=alien-invasion
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/alien-invasion
+
+[Install]
+WantedBy=multi-user.target
