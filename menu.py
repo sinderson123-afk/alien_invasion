@@ -140,7 +140,7 @@ class MenuSystem:
         """Create tutorial screen instructions"""
         # Control instructions
         self.tutorial_controls = [
-            ("Arrow Keys",  "Move ship left / right"),
+            ("A / D",       "Move left / right (or use arrow keys)"),
             ("Space",       "Fire bullets"),
             ("E",           "Launch homing missile"),
             ("M",           "Open / Close shop"),

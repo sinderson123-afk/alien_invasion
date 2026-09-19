@@ -1163,10 +1163,10 @@ class AlienInvasion:
                 self.save_disabled = False
                 self.state = GameState.PAUSED
                 self.sound.set_bgm_volume(self.settings.bgm_pause_volume)
-            elif event.key == pygame.K_RIGHT:
+            elif event.key in (pygame.K_RIGHT, pygame.K_d):
                 self.ship.target_x = None
                 self.ship.moving_right = True
-            elif event.key == pygame.K_LEFT:
+            elif event.key in (pygame.K_LEFT, pygame.K_a):
                 self.ship.target_x = None
                 self.ship.moving_left = True
             elif event.key == pygame.K_SPACE:
@@ -1211,9 +1211,9 @@ class AlienInvasion:
     def _check_keyup_events(self, event):
         """Handle key release (only movement keys in PLAYING)"""
         if self.state == GameState.PLAYING:
-            if event.key == pygame.K_RIGHT:
+            if event.key in (pygame.K_RIGHT, pygame.K_d):
                 self.ship.moving_right = False
-            elif event.key == pygame.K_LEFT:
+            elif event.key in (pygame.K_LEFT, pygame.K_a):
                 self.ship.moving_left = False
             elif event.key == pygame.K_SPACE:
                 self.firing = False
