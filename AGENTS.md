@@ -36,7 +36,8 @@ There is no root `requirements.txt` — only `web/requirements.txt` for the serv
 
 ## Quirks & conventions
 
-- **No tests, no linter, no type checker config** in this repo. Manual verification only.
+- **Text control tests**: `python -m unittest discover -s tests -v` (requires pygame). Uses dummy SDL and isolated temporary saves, never live accounts. No linter or type checker config.
+- **Optional text controls**: `python alien_invasion.py --text-control`; `text_control.py` provides loopback JSON observations and ordinary inputs, `game_control.py` is the stdlib client. See `TEXT_CONTROL.md`. Keep mutations on the game thread and preserve normal gameplay limits; never export hidden AI decisions or account credentials.
 - **`pygame.key.stop_text_input()`** is called at startup to prevent Chinese IME from intercepting keyboard input.
 - **`cv2` (OpenCV)** is an optional dependency for `video_background.py` menu video — falls back to static blur. Not listed in pip install.
 - **Networking**: `web_client.py` uses stdlib only (`urllib`). Handles offline caching of uploads.

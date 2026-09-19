@@ -31,7 +31,7 @@ from login_ui import LoginOverlay
 
 class AlienInvasion:
     """Main game class managing all resources and behavior"""
-    def __init__(self):
+    def __init__(self, text_control_port=None, control_file=None):
         """Initialize game and create resources"""
         pygame.init()
         # Disable SDL text input to prevent IME from intercepting keys
@@ -134,10 +134,18 @@ class AlienInvasion:
         if not IS_DEV_BUILD:
             self._start_update_check()
 
+        self.text_control = None
+        if text_control_port is not None:
+            from text_control import TextControl
+            session_file = control_file or Path(self.settings.save_file).parent / 'text-control.dat'
+            self.text_control = TextControl(self, text_control_port, session_file)
+
     def run_game(self):
         """Start the main game loop"""
         while True:
             self._check_events()
+            if self.text_control is not None:
+                self.text_control.pump()
 
             if self.state == GameState.PLAYING:
                 self._active_bg().update()
@@ -172,7 +180,7 @@ class AlienInvasion:
                 elif self.clover_push_frames > 0:
                     self._update_clover_push()
                     self.ship.update()
-                    if self.firing or self.mouse_firing:
+                    if self._is_firing():
                         if self._fire_cooldown > 0:
                             self._fire_cooldown -= 1
                         else:
@@ -225,7 +233,7 @@ class AlienInvasion:
                         self.flashing_alien_pos = None
                 else:
                     self.ship.update()
-                    if self.firing or self.mouse_firing:
+                    if self._is_firing():
                         if self._fire_cooldown > 0:
                             self._fire_cooldown -= 1
                         else:
@@ -293,11 +301,16 @@ class AlienInvasion:
                     self._notification_text = ''
 
             self._update_screen()
+            if self.text_control is not None:
+                self.text_control.publish()
             self.clock.tick(60)
 
     def _check_events(self):
         """Handle keyboard and mouse events (routed by current state)"""
         for event in pygame.event.get():
+            if event.type in (pygame.KEYDOWN, pygame.KEYUP, pygame.MOUSEBUTTONDOWN):
+                if self.text_control is not None:
+                    self.text_control.release()  # Manual input takes over immediately.
             if event.type == pygame.QUIT:
                 self._quit_game()
             if event.type == pygame.WINDOWFOCUSLOST:
@@ -444,9 +457,15 @@ class AlienInvasion:
             self.state = GameState.MENU
 
     def _clear_controls(self):
+        if getattr(self, 'text_control', None) is not None:
+            self.text_control.release()
         self.ship.moving_left = self.ship.moving_right = False
         self.ship.target_x = None
         self.firing = self.mouse_firing = False
+
+    def _is_firing(self):
+        return (self.firing or self.mouse_firing
+                or (self.text_control is not None and self.text_control.firing))
 
     def _mouse_controls(self):
         """Public controls use the same action handlers as the keyboard."""
@@ -2728,6 +2747,18 @@ class AlienInvasion:
             self._create_fleet()
             self.ship.center_ship()
 if __name__ == "__main__":
-    # Create game instance and run
-    ai = AlienInvasion()
-    ai.run_game()
+    import argparse
+    parser = argparse.ArgumentParser(description='Alien Invasion')
+    parser.add_argument('--text-control', nargs='?', type=int, const=8765, metavar='PORT',
+                        help='Enable local text controls (default port: 8765)')
+    parser.add_argument('--control-file', type=Path, help='Local text-control session file')
+    args = parser.parse_args()
+    if args.text_control is not None and not 0 <= args.text_control <= 65535:
+        parser.error('--text-control must be a port from 0 to 65535')
+    ai = AlienInvasion(args.text_control, args.control_file)
+    try:
+        ai.run_game()
+    finally:
+        if ai.text_control is not None:
+            ai.text_control.close()
+        pygame.quit()

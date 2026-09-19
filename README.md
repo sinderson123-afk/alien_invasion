@@ -121,6 +121,8 @@ alien_invasion/
 
 ## 操作说明
 
+脚本也可以通过本地 JSON 接口读取战况并游玩：`python alien_invasion.py --text-control`。参见[文本控制接口与左右巡航示例](TEXT_CONTROL.md)。
+
 | 按键 | 功能 |
 |------|------|
 | ← → | 移动飞船 |
