@@ -18,6 +18,7 @@ from torch.distributions import Categorical
 
 from file_crypto import decrypt_json, encrypt_json
 from game_control import GameClient
+from pilot_tactics import TACTICAL_DIM, BehaviorMetrics, spatial_action, spatial_features, tactical_cases
 
 OFFERS = ['buy_item:magnet', 'buy_item:shield', 'buy_item:clover',
           'buy_armor:silver', 'buy_armor:gold', 'buy_armor:mithril',
@@ -28,6 +29,7 @@ ACTIONS = ['left_fire', 'right_fire', 'stop_fire', 'left', 'right', 'stop',
            'missile', 'magnet', 'clover', 'shop', 'back'] + OFFERS
 HAZARDS = ('alien', 'boss', 'hostile_bullet', 'hostile_missile', 'meteor', 'meteor_fragment')
 OBS_DIM = 90
+TACTICAL_OBS_DIM = OBS_DIM + TACTICAL_DIM
 
 
 def command(action):
@@ -53,9 +55,10 @@ class Predictor(nn.Module):
 
 
 class Policy(nn.Module):
-    def __init__(self):
+    def __init__(self, obs_dim=OBS_DIM):
         super().__init__()
-        self.body = nn.Sequential(nn.Linear(OBS_DIM, 128), nn.Tanh(),
+        self.obs_dim = obs_dim
+        self.body = nn.Sequential(nn.Linear(obs_dim, 128), nn.Tanh(),
                                   nn.Linear(128, 128), nn.Tanh())
         self.actor = nn.Linear(128, len(ACTIONS))
         self.critic = nn.Linear(128, 1)
@@ -67,7 +70,7 @@ class Policy(nn.Module):
 
 class Observer:
     """Features use only current/past exported observations, never game objects."""
-    def __init__(self, predictor=None):
+    def __init__(self, predictor=None, obs_dim=OBS_DIM):
         self.previous = {}
         self.velocities = {}
         self.previous_frame = None
@@ -77,6 +80,11 @@ class Observer:
         self.predictor = predictor
         self.tracks = []
         self.cached = None
+        self.obs_dim = obs_dim
+        self.ship_x = None
+        self.ship_speed = None
+        self.bullet_speed = None
+        self.tactical = np.zeros(TACTICAL_DIM, dtype=np.float32)
 
     def encode(self, s):
         frame = s['frame']
@@ -150,6 +158,22 @@ class Observer:
         obs += bins.flatten().tolist() + near
         obs += [skills.get(k, 0) / 5 for k in ('speed', 'ammo', 'vitality', 'damage')]
         obs += [items.get(k, 0) / 5 for k in ('magnet', 'shield', 'clover')] + [armor_level / 5]
+        if s.get('accepts_controls'):
+            measured = abs(sx - self.ship_x) / elapsed if self.ship_x is not None else 0
+            if .0003 < measured < .012:
+                self.ship_speed = measured
+            self.ship_x = sx
+            shots = [-velocity[o['id']][1] for o in s.get('objects', [])
+                     if o['kind'] == 'bullet' and o['id'] in self.previous
+                     and velocity[o['id']][1] < 0]
+            if shots:
+                self.bullet_speed = float(np.median(shots))
+        else:
+            self.ship_x = None
+        self.tactical = spatial_features(s, velocity, self.ship_speed or 1.5 / width,
+                                         self.bullet_speed or 2.5 / height)
+        if self.obs_dim == TACTICAL_OBS_DIM:
+            obs += self.tactical.tolist()
         self.previous, self.velocities, self.previous_frame = current, velocity, frame
         self.cached = np.clip(np.asarray(obs, dtype=np.float32), -5, 5), mask
         return self.cached
@@ -161,7 +185,7 @@ class Observer:
             self.last_shop = frame
 
 
-def teacher(s, obs, mask, observer, skill_drills=False, aim_drills=False):
+def teacher(s, obs, mask, observer, skill_drills=False, aim_drills=False, tactics_drills=False):
     """Warm-start demonstrations. This is a baseline, not the trained network."""
     hud = s.get('hud', {})
     if s['state'] == 'shop':
@@ -204,6 +228,8 @@ def teacher(s, obs, mask, observer, skill_drills=False, aim_drills=False):
         return 7
     if mask[9] and (hud.get('coins', 0) >= 10 or (hud.get('hp', 30) < 20 and hud.get('coins', 0) >= 8)):
         return 9
+    if tactics_drills:
+        return spatial_action(observer.tactical, sx, observer.direction)
     direction = observer.direction or -1
     if sx < .14:
         direction = 1
@@ -308,7 +334,7 @@ class Practice:
 def save_checkpoint(path, policy, predictor, metrics):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {'version': 1, 'actions': ACTIONS, 'metrics': metrics,
+    data = {'version': 2, 'obs_dim': policy.obs_dim, 'actions': ACTIONS, 'metrics': metrics,
             'policy': {k: v.detach().cpu().tolist() for k, v in policy.state_dict().items()},
             'predictor': {k: v.detach().cpu().tolist() for k, v in predictor.state_dict().items()}}
     if not encrypt_json(data, path):
@@ -317,9 +343,12 @@ def save_checkpoint(path, policy, predictor, metrics):
 
 def load_checkpoint(path):
     data = decrypt_json(Path(path))
-    if not data or data['version'] != 1 or data['actions'] != ACTIONS:
+    if not data or data['version'] not in (1, 2) or data['actions'] != ACTIONS:
         raise ValueError('Invalid/incompatible pilot checkpoint')
-    policy, predictor = Policy(), Predictor()
+    obs_dim = data.get('obs_dim', OBS_DIM)
+    if obs_dim not in (OBS_DIM, TACTICAL_OBS_DIM):
+        raise ValueError('Unsupported observation dimensions')
+    policy, predictor = Policy(obs_dim), Predictor()
     policy.load_state_dict({k: torch.tensor(v) for k, v in data['policy'].items()})
     predictor.load_state_dict({k: torch.tensor(v) for k, v in data['predictor'].items()})
     return policy.eval(), predictor.eval(), data['metrics']
@@ -462,7 +491,7 @@ def play(args):
     torch.set_num_threads(1)
     policy, predictor, metrics = load_checkpoint(args.output)
     client = GameClient(args.session_file)
-    obsr = Observer(predictor)
+    obsr = Observer(predictor, policy.obs_dim)
     s = client.state()
     if s['state'] == 'menu' and args.start:
         client.act(action='start'); time.sleep(.1)
@@ -520,9 +549,10 @@ def evaluate(args):
     for episode in range(args.episodes):
         practice = Practice(args.seed + episode)
         counts = {}
+        behavior = BehaviorMetrics()
         try:
             s = practice.reset()
-            obsr = Observer(predictor)
+            obsr = Observer(predictor, policy.obs_dim)
             score, hp = 0, 30
             for step in range(args.steps):
                 if s.get('phase') in ('dying', 'game_over') or s['state'] == 'menu':
@@ -530,7 +560,7 @@ def evaluate(args):
                 obs, mask = obsr.encode(s)
                 if s.get('accepts_controls') or s['state'] == 'shop':
                     if args.baseline:
-                        a = teacher(s, obs, mask, obsr)
+                        a = teacher(s, obs, mask, obsr, tactics_drills=args.tactics_drills)
                     else:
                         with torch.no_grad():
                             a = int(policy(torch.tensor(obs), torch.tensor(mask))[0].argmax())
@@ -538,17 +568,26 @@ def evaluate(args):
                     counts[ACTIONS[a]] = counts.get(ACTIONS[a], 0) + 1
                 else:
                     a = 5
-                s = practice.step(a)
+                next_s = practice.step(a)
+                behavior.record(s, obsr.tactical, a, next_s)
+                s = next_s
                 score = s.get('hud', {}).get('score', score)
                 hp = s.get('hud', {}).get('hp', hp)
             row = {'seed': args.seed + episode, 'score': score, 'hp': hp, 'steps': step + 1,
-                   'truncated': step + 1 >= args.steps, 'actions': counts}
+                   'truncated': step + 1 >= args.steps, 'actions': counts,
+                   'behavior': behavior.report()}
             results.append(row)
             print('EVAL', json.dumps(row), flush=True)
         finally:
             practice.close()
+    totals = {key: sum(r['behavior'][key] for r in results) for key in results[0]['behavior']}
     print('EVAL_SUMMARY', json.dumps({'mean': float(np.mean([r['score'] for r in results])),
-                                     'best': max(r['score'] for r in results)}), flush=True)
+                                     'best': max(r['score'] for r in results),
+                                     'mean_coins_earned': totals['coins_earned'] / len(results),
+                                     'single_target_wrong_stop_rate': totals['misaligned_stop_steps']
+                                     / max(1, totals['single_target_steps']),
+                                     'safe_pickup_approach_rate': totals['pickup_approach_steps']
+                                     / max(1, totals['safe_pickup_steps'])}), flush=True)
     report = Path(str(args.output) + ('.baseline-evaluation.dat' if args.baseline else '.evaluation.dat'))
     encrypt_json({'results': results}, report)
 
@@ -559,22 +598,46 @@ def refine(args):
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     policy, predictor, metrics = load_checkpoint(args.output)
+    if args.tactics_drills and policy.obs_dim == OBS_DIM:
+        expanded = Policy(TACTICAL_OBS_DIM)
+        weights = policy.state_dict()
+        first = torch.zeros(128, TACTICAL_OBS_DIM)
+        first[:, :OBS_DIM] = weights['body.0.weight']
+        weights['body.0.weight'] = first
+        expanded.load_state_dict(weights)
+        policy = expanded
     policy.train()
     optimizer = torch.optim.Adam(policy.parameters(), lr=3e-4)
     xs, ms, ys, importance = [], [], [], []
+    if args.tactics_drills:
+        for _, direction, pair in tactical_cases(args.seed + 100000, 6000):
+            observer = Observer(predictor, policy.obs_dim)
+            observer.direction = direction
+            for snapshot in pair:
+                obs, mask = observer.encode(snapshot)
+            xs.append(obs); ms.append(mask)
+            ys.append(spatial_action(observer.tactical, obs[0], direction))
+            importance.append(2.)
+        # Teach precise geometry before collecting full-game recovery states.
+        x = torch.tensor(np.asarray(xs)); m = torch.tensor(np.asarray(ms)); y = torch.tensor(ys)
+        for _ in range(20):
+            for ix in torch.randperm(len(x)).split(256):
+                loss = nn.functional.cross_entropy(policy(x[ix], m[ix])[0], y[ix])
+                optimizer.zero_grad(); loss.backward(); optimizer.step()
+        print('TACTICAL_WARMUP', len(xs), flush=True)
     scores = []
     action_counts = {}
     for episode in range(args.episodes):
         env = Practice(args.seed + episode)
         try:
-            s = env.reset(); obsr = Observer(predictor); score = 0
+            s = env.reset(); obsr = Observer(predictor, policy.obs_dim); score = 0
             for step in range(args.steps):
                 if s.get('phase') in ('dying', 'game_over') or s['state'] == 'menu':
                     break
                 obs, mask = obsr.encode(s)
                 if s.get('accepts_controls') or s['state'] == 'shop':
                     target = teacher(s, obs, mask, obsr, skill_drills=args.skill_drills,
-                                     aim_drills=args.aim_drills)
+                                     aim_drills=args.aim_drills, tactics_drills=args.tactics_drills)
                     with torch.no_grad():
                         predicted = int(policy(torch.tensor(obs), torch.tensor(mask))[0].argmax())
                     xs.append(obs); ms.append(mask); ys.append(target)
@@ -584,6 +647,8 @@ def refine(args):
                     mixture = .8 if args.skill_drills and (target >= 6 or s['state'] == 'shop') else .2
                     if args.aim_drills and any(o['kind'] == 'boss' for o in s.get('objects', [])):
                         mixture = .8
+                    if args.tactics_drills:
+                        mixture = .7
                     a = target if random.random() < mixture else predicted
                     obsr.used(a, s['frame'])
                     action_counts[ACTIONS[a]] = action_counts.get(ACTIONS[a], 0) + 1
@@ -606,13 +671,35 @@ def refine(args):
                            dagger_rollout_scores=scores, dagger_seed=args.seed,
                            refinement_action_counts=action_counts, skill_drills=args.skill_drills)
             metrics['aim_drills'] = args.aim_drills
+            metrics['tactics_drills'] = args.tactics_drills
+            metrics['synthetic_spatial_samples'] = 6000 if args.tactics_drills else 0
             save_checkpoint(args.output, policy, predictor, metrics)
         print('DAGGER', json.dumps({'episode': episode + 1, 'score': score, 'samples': len(xs), 'actions': action_counts}), flush=True)
 
 
+def diagnose(args):
+    """Compare neural decisions on observation-only spatial cases."""
+    torch.set_num_threads(1)
+    policy, predictor, _ = load_checkpoint(args.output)
+    results = {}
+    for category, direction, pair in tactical_cases(args.seed, args.steps):
+        observer = Observer(predictor, policy.obs_dim)
+        observer.direction = direction
+        for state in pair:
+            obs, mask = observer.encode(state)
+        expected = spatial_action(observer.tactical, obs[0], direction)
+        with torch.no_grad():
+            actual = int(policy(torch.tensor(obs), torch.tensor(mask))[0].argmax())
+        row = results.setdefault(category, {'cases': 0, 'correct': 0, 'wrong_stop': 0})
+        row['cases'] += 1
+        row['correct'] += int(actual == expected)
+        row['wrong_stop'] += int(actual in (2, 5) and expected in (0, 1))
+    print('DIAGNOSTICS', json.dumps(results), flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['train', 'play', 'evaluate', 'refine'])
+    parser.add_argument('mode', choices=['train', 'play', 'evaluate', 'refine', 'diagnose'])
     parser.add_argument('--output', type=Path, default=Path('training_runs/pilot.dat'))
     parser.add_argument('--seed', type=int, default=20260920)
     parser.add_argument('--episodes', type=int, default=6)
@@ -624,6 +711,7 @@ def main():
     parser.add_argument('--baseline', action='store_true')
     parser.add_argument('--skill-drills', action='store_true')
     parser.add_argument('--aim-drills', action='store_true')
+    parser.add_argument('--tactics-drills', action='store_true')
     args = parser.parse_args()
     if args.episodes < 1 or args.steps < 50 or args.ppo < 0 or args.seconds < 1:
         parser.error('episodes/seconds must be positive, steps >= 50, ppo >= 0')
@@ -633,6 +721,8 @@ def main():
         evaluate(args)
     elif args.mode == 'refine':
         refine(args)
+    elif args.mode == 'diagnose':
+        diagnose(args)
     else:
         play(args)
 
