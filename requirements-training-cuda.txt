@@ -1,0 +1,5 @@
+# Install in a separate virtual environment; gameplay does not require CUDA.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.0+cu130
+numpy==2.5.2
+pygame==2.6.1

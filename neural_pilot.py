@@ -55,13 +55,16 @@ class Predictor(nn.Module):
 
 
 class Policy(nn.Module):
-    def __init__(self, obs_dim=OBS_DIM):
+    def __init__(self, obs_dim=OBS_DIM, hidden=128, depth=2):
         super().__init__()
         self.obs_dim = obs_dim
-        self.body = nn.Sequential(nn.Linear(obs_dim, 128), nn.Tanh(),
-                                  nn.Linear(128, 128), nn.Tanh())
-        self.actor = nn.Linear(128, len(ACTIONS))
-        self.critic = nn.Linear(128, 1)
+        self.hidden, self.depth = hidden, depth
+        layers = []
+        for index in range(depth):
+            layers.extend((nn.Linear(obs_dim if index == 0 else hidden, hidden), nn.Tanh()))
+        self.body = nn.Sequential(*layers)
+        self.actor = nn.Linear(hidden, len(ACTIONS))
+        self.critic = nn.Linear(hidden, 1)
 
     def forward(self, x, mask):
         h = self.body(x)
@@ -334,7 +337,8 @@ class Practice:
 def save_checkpoint(path, policy, predictor, metrics):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {'version': 2, 'obs_dim': policy.obs_dim, 'actions': ACTIONS, 'metrics': metrics,
+    data = {'version': 3, 'obs_dim': policy.obs_dim, 'hidden': policy.hidden,
+            'depth': policy.depth, 'actions': ACTIONS, 'metrics': metrics,
             'policy': {k: v.detach().cpu().tolist() for k, v in policy.state_dict().items()},
             'predictor': {k: v.detach().cpu().tolist() for k, v in predictor.state_dict().items()}}
     if not encrypt_json(data, path):
@@ -343,12 +347,15 @@ def save_checkpoint(path, policy, predictor, metrics):
 
 def load_checkpoint(path):
     data = decrypt_json(Path(path))
-    if not data or data['version'] not in (1, 2) or data['actions'] != ACTIONS:
+    if not data or data['version'] not in (1, 2, 3) or data['actions'] != ACTIONS:
         raise ValueError('Invalid/incompatible pilot checkpoint')
     obs_dim = data.get('obs_dim', OBS_DIM)
     if obs_dim not in (OBS_DIM, TACTICAL_OBS_DIM):
         raise ValueError('Unsupported observation dimensions')
-    policy, predictor = Policy(obs_dim), Predictor()
+    hidden, depth = data.get('hidden', 128), data.get('depth', 2)
+    if not isinstance(hidden, int) or not 32 <= hidden <= 2048 or not isinstance(depth, int) or not 1 <= depth <= 6:
+        raise ValueError('Unsupported policy architecture')
+    policy, predictor = Policy(obs_dim, hidden, depth), Predictor()
     policy.load_state_dict({k: torch.tensor(v) for k, v in data['policy'].items()})
     predictor.load_state_dict({k: torch.tensor(v) for k, v in data['predictor'].items()})
     return policy.eval(), predictor.eval(), data['metrics']
@@ -490,6 +497,8 @@ def train(args):
 def play(args):
     torch.set_num_threads(1)
     policy, predictor, metrics = load_checkpoint(args.output)
+    sample_actions = args.sample or metrics.get('action_selection') == 'sample'
+    torch.manual_seed(args.seed)
     client = GameClient(args.session_file)
     obsr = Observer(predictor, policy.obs_dim)
     s = client.state()
@@ -521,7 +530,7 @@ def play(args):
             obs, mask = obsr.encode(s)
             with torch.no_grad():
                 logits, _ = policy(torch.tensor(obs), torch.tensor(mask))
-                a = int(logits.argmax())
+                a = int(Categorical(logits=logits).sample() if sample_actions else logits.argmax())
             try:
                 client.act(**command(a))
                 obsr.used(a, s['frame'])
@@ -544,10 +553,12 @@ def play(args):
 
 def evaluate(args):
     torch.set_num_threads(1)
-    policy, predictor, _ = load_checkpoint(args.output)
+    policy, predictor, metrics = load_checkpoint(args.output)
+    sample_actions = args.sample or metrics.get('action_selection') == 'sample'
     results = []
     for episode in range(args.episodes):
         practice = Practice(args.seed + episode)
+        torch.manual_seed(args.seed + episode)
         counts = {}
         behavior = BehaviorMetrics()
         try:
@@ -563,7 +574,8 @@ def evaluate(args):
                         a = teacher(s, obs, mask, obsr, tactics_drills=args.tactics_drills)
                     else:
                         with torch.no_grad():
-                            a = int(policy(torch.tensor(obs), torch.tensor(mask))[0].argmax())
+                            logits = policy(torch.tensor(obs), torch.tensor(mask))[0]
+                            a = int(Categorical(logits=logits).sample() if sample_actions else logits.argmax())
                     obsr.used(a, s['frame'])
                     counts[ACTIONS[a]] = counts.get(ACTIONS[a], 0) + 1
                 else:
@@ -574,6 +586,7 @@ def evaluate(args):
                 score = s.get('hud', {}).get('score', score)
                 hp = s.get('hud', {}).get('hp', hp)
             row = {'seed': args.seed + episode, 'score': score, 'hp': hp, 'steps': step + 1,
+                   'action_selection': 'sample' if sample_actions and not args.baseline else 'greedy',
                    'truncated': step + 1 >= args.steps, 'actions': counts,
                    'behavior': behavior.report()}
             results.append(row)
@@ -712,6 +725,7 @@ def main():
     parser.add_argument('--skill-drills', action='store_true')
     parser.add_argument('--aim-drills', action='store_true')
     parser.add_argument('--tactics-drills', action='store_true')
+    parser.add_argument('--sample', action='store_true', help='Sample policy actions (PPO rollout behavior)')
     args = parser.parse_args()
     if args.episodes < 1 or args.steps < 50 or args.ppo < 0 or args.seconds < 1:
         parser.error('episodes/seconds must be positive, steps >= 50, ppo >= 0')

@@ -18,11 +18,50 @@ python neural_pilot.py train --episodes 24 --steps 2500 --ppo 16 --output traini
 2. 用随后实际出现的观测学习约半秒后的敌人位移。预测器在匀速外推上学习修正，保留后 20% 时间段作验证，并报告相对匀速基线的误差。这是时间留出验证，不等同于独立关卡泛化评测。
 3. 用 [PPO-Clip](https://spinningup.openai.com/en/latest/algorithms/ppo.html) 更新策略/价值网络。奖励来自实际得分增量、失血和死亡，并对拖延施加小惩罚。商店开关不产生得分奖励。
 
-策略网络为两层各 128 个单元的 MLP，输出 23 个动作与状态价值。旧模型使用 90 维观测；瞄准/拾取纠错模型使用 110 维，额外保留精确目标偏移、估计射击交会位置、掉落物方向及沿途风险。预测器为两层 64/32 单元网络，输入连续可见位置、估计速度、上一速度、对象类型及自己的位置等 9 个数。依赖安装参见 [PyTorch 官方说明](https://pytorch.org/get-started/locally/)。
+基础策略网络为两层各 128 个单元的 MLP，输出 23 个动作与状态价值；CUDA 管线可增加宽度和层数。旧模型使用 90 维观测；瞄准/拾取纠错模型使用 110 维，额外保留精确目标偏移、估计射击交会位置、掉落物方向及沿途风险。预测器为两层 64/32 单元网络，输入连续可见位置、估计速度、上一速度、对象类型及自己的位置等 9 个数。依赖安装参见 [PyTorch 官方说明](https://pytorch.org/get-started/locally/)。
 
 动作包含移动与射击组合、导弹、磁铁、四叶草、打开/关闭商店，以及三类消耗品、五级护甲、四类技能升级。不可执行或买不起的动作被屏蔽；商店最多每 300 个游戏循环帧打开一次。道具消耗、价格、技能上限、冷却和碰撞由原游戏决定。
 
 ## 独立评测
+
+### CUDA 大规模训练
+
+原来的 `requirements-training.txt` 配合 CPU 安装源不会使用显卡。GPU 管线使用独立环境，安装见 [PyTorch 官方说明](https://docs.pytorch.org/get-started/locally/)：
+
+```powershell
+python -m venv "$env:LOCALAPPDATA\AlienInvasionPlay\gpu-venv"
+& "$env:LOCALAPPDATA\AlienInvasionPlay\gpu-venv\Scripts\python.exe" -m pip install -r requirements-training-cuda.txt
+Copy-Item training_runs/champion.dat training_runs/pilot-gpu-source.dat
+& "$env:LOCALAPPDATA\AlienInvasionPlay\gpu-venv\Scripts\python.exe" -u neural_gpu.py --source training_runs/pilot-gpu-source.dat --output training_runs/pilot-gpu.dat
+```
+
+默认 8 个独立进程运行原游戏并行采样，一个 CUDA 进程集中学习。每个练习进程有独立临时存档和游戏状态，无账号、无上传；仍执行原游戏帧和可见信息限制。旧模型不会自动替换。
+
+较大的策略网络为 110→1024→1024→1024→23，另有价值输出；从头训练策略，继承旧敌人位移预测器。先用 60,000 个纯观测几何样本预训练 40 轮，监督学习使用 BF16 和最多 8,192 样本的批量，再做 16 轮并行纠错模仿、64 轮 PPO。每轮 8×256=2,048 个决策，合计 163,840 个真实练习决策，最多约 983,040 个基础游戏帧（另有正常过场帧）。
+
+模仿采样混入 70% 示范动作；PPO 阶段只从网络分布采样，避免把示范动作错误当成旧策略采样。PPO 使用完整精度计算概率、优势和价值，裁剪比率为 0.85–1.15，梯度范数上限 0.5，近似 KL 超过 0.025 时提前停止当轮更新，并用少量历史示范损失保持瞄准和拾取能力。奖励来自可见得分、实际金币收入、伤害和死亡；购物本身不产生奖励。
+
+日志报告 GPU 名称、实际模型参数量、已采样决策数、采样时间、GPU 峰值已分配/保留显存。显存保留量不等于实际使用量，也不等于计算利用率。环境采样仍由 CPU 完成，因此 GPU 占用会在采样与更新阶段间波动。CUDA 分配预算限制为总显存的 80%，不是强行分配到 80%。
+
+每 16 轮及模仿阶段结束时保存独立候选检查点，最终保存 `pilot-gpu.dat`。检查点记录网络宽度/深度，普通 `neural_pilot.py play/evaluate/diagnose` 会自动加载，也兼容旧版小网络。训练轮次、并行进程数、网络大小、批量和回放容量均有命令行选项；`python neural_gpu.py --help` 可查看。
+
+也可以保留已有策略再扩容，而不是从头学习。`--widen-source` 要求层数与来源一致、宽度为来源宽度的整数倍；它复制神经元并按副本数缩放输出连接，以浮点误差范围内相同的动作/价值输出开始训练。隐藏连接的零和扰动打破副本对称性。`--balance-actions` 对少见的购物/技能等动作加权，避免其淹没在移动样本中；`--warmup-epochs 0` 可跳过重新预训练。
+
+```powershell
+python neural_gpu.py --source training_runs/pilot-gpu-source.dat --output training_runs/pilot-gpu-widen.dat --seed 122000 --hidden 1024 --depth 2 --widen-source --balance-actions --warmup-epochs 0 --imitation-rounds 4 --ppo-rounds 32
+```
+
+PPO 的采样策略与每次取最大概率的贪心策略可能表现不同。可用 `neural_pilot.py evaluate --sample ...` 或 `play --sample ...` 明确按网络概率抽样；评测每局使用对应种子固定动作采样随机性。若检查点的 `metrics.action_selection` 为 `sample`，会默认采样。旧检查点仍默认贪心。几何 `diagnose` 始终检查最大概率动作，不能代替采样策略的完整对局评测。
+
+本次两分支训练及独立评测记录见 [NEURAL_GPU_RESULTS.md](NEURAL_GPU_RESULTS.md)：已运行 237,568 次真实练习决策，最终没有替换原 `champion.dat`，因为留出结果未确认提升。
+
+短跑检查 GPU 和多进程管线：
+
+```powershell
+python neural_gpu.py --workers 2 --hidden 128 --depth 2 --horizon 16 --imitation-rounds 1 --ppo-rounds 1 --spatial-samples 128 --warmup-epochs 1 --epochs 1 --batch 32 --output training_runs/gpu-smoke.dat
+```
+
+### 评测命令
 
 ```powershell
 python neural_pilot.py evaluate --episodes 5 --steps 6000 --seed 1000 --output training_runs/pilot-v1.dat

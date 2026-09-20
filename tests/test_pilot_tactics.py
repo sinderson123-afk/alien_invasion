@@ -99,6 +99,59 @@ class SpatialTests(unittest.TestCase):
             mask = torch.ones(23, dtype=torch.bool)
             torch.testing.assert_close(policy(obs, mask)[0], restored(obs, mask)[0])
 
+    def test_large_policy_checkpoint_preserves_architecture(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'large.dat'
+            policy = Policy(110, hidden=256, depth=3)
+            save_checkpoint(path, policy, Predictor(), {})
+            restored, _, _ = load_checkpoint(path)
+            self.assertEqual((restored.hidden, restored.depth), (256, 3))
+            obs = torch.randn(4, 110)
+            mask = torch.ones(4, 23, dtype=torch.bool)
+            mask[:, 12:] = False
+            torch.testing.assert_close(policy(obs, mask)[0], restored(obs, mask)[0])
+
+    def test_parallel_advantages_do_not_cross_episode_boundaries(self):
+        from neural_gpu import advantages
+        rewards = torch.tensor([[1., 10.], [2., 20.]])
+        dones = torch.tensor([[True, False], [False, True]])
+        result = advantages(rewards, torch.zeros_like(rewards), dones,
+                            torch.tensor([3., 99.]), gamma=1., lam=1.)
+        torch.testing.assert_close(result, torch.tensor([[1., 30.], [5., 20.]]))
+
+    def test_parallel_workers_have_independent_normal_movement(self):
+        from neural_gpu import Environments
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'source.dat'
+            save_checkpoint(path, Policy(110), Predictor(), {})
+            envs = Environments(2, path, 990000)
+            try:
+                before = [s['obs'][0] for s in envs.states]
+                states = envs.step([0, 1])
+                self.assertLess(states[0]['obs'][0], before[0])
+                self.assertGreater(states[1]['obs'][0], before[1])
+                for state in states:
+                    self.assertEqual(state['obs'].shape, (110,))
+                    self.assertTrue(np.isfinite(state['obs']).all())
+                    self.assertTrue(state['mask'][state['label']])
+                    self.assertFalse(state['done'])
+            finally:
+                envs.close()
+            self.assertTrue(all(not p.is_alive() for p in envs.processes))
+
+    def test_widening_preserves_policy_value_and_action_mask(self):
+        from neural_gpu import widen_policy
+        source = Policy(110, hidden=128, depth=2)
+        enlarged = widen_policy(source, 512)
+        obs = torch.randn(17, 110)
+        mask = torch.rand(17, 23) > .3
+        original_logits, original_value = source(obs, mask)
+        logits, value = enlarged(obs, mask)
+        torch.testing.assert_close(logits, original_logits, atol=2e-6, rtol=2e-5)
+        torch.testing.assert_close(value, original_value, atol=2e-6, rtol=2e-5)
+        self.assertGreater(sum(p.numel() for p in enlarged.parameters()),
+                           sum(p.numel() for p in source.parameters()))
+
 
 if __name__ == '__main__':
     unittest.main()
