@@ -123,6 +123,8 @@ alien_invasion/
 
 脚本也可以通过本地 JSON 接口读取战况并游玩：`python alien_invasion.py --text-control`。参见[文本控制接口与左右巡航示例](TEXT_CONTROL.md)。
 
+神经网络预测、模仿学习、PPO 训练与实时挑战见[神经网络玩家](NEURAL_PILOT.md)。训练使用隔离练习档，正式挑战通过正常游戏接口进行。
+
 | 按键 | 功能 |
 |------|------|
 | A / D 或 ← / → | 移动飞船 |

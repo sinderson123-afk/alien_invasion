@@ -24,6 +24,16 @@ from text_control import validate_command
 
 
 class ValidationTests(unittest.TestCase):
+    def test_fresh_profiles_do_not_share_skills_or_items(self):
+        from player_data import PlayerData
+        with tempfile.TemporaryDirectory() as folder:
+            first = PlayerData(Path(folder) / 'first.dat').load()
+            first['skills']['speed'] = 5
+            first['items']['shield'] = 5
+            second = PlayerData(Path(folder) / 'second.dat').load()
+            self.assertEqual(second['skills']['speed'], 0)
+            self.assertEqual(second['items']['shield'], 0)
+
     def test_mutations_and_malformed_controls_rejected(self):
         for payload in ({'score': 9999}, {'hp': 999}, {'x': 0}, {'action': 'eval'},
                         {'move': 'up'}, {'fire': 1}, {'lease_ms': True},
@@ -34,6 +44,39 @@ class ValidationTests(unittest.TestCase):
 
 
 class LoopTests(unittest.TestCase):
+    def test_shop_uses_visible_prices_and_does_not_stack_speed(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch('sys.argv', [str(Path(folder) / 'game.py')]), \
+                patch.object(AlienInvasion, '_start_update_check'), \
+                patch('player_data.PlayerData.is_authenticated', return_value=True):
+            game = AlienInvasion(0, Path(folder) / 'control.dat')
+            try:
+                # Isolated economy fixture; no real account or score upload.
+                game.stats.coins = 20
+                control = game.text_control
+                control.apply({'action': 'shop'})
+                game._update_screen()
+                control.apply({'action': 'purchase', 'offer': 'upgrade_skill:speed'})
+                self.assertEqual(game.stats.coins, 17)
+                speed = game.settings.ship_speed
+                self.assertAlmostEqual(speed, 1.65)
+                control.apply({'action': 'purchase', 'offer': 'buy_item:shield'})
+                self.assertEqual(game.stats.coins, 7)
+                self.assertEqual(game.stats.items['shield'], 1)
+                self.assertEqual(game.settings.ship_speed, speed)
+                with self.assertRaises(ValueError):
+                    control.apply({'action': 'purchase', 'offer': 'buy_item:shield'})
+                with self.assertRaises(ValueError):
+                    control.apply({'action': 'purchase', 'offer': 'buy_armor:tilkal'})
+                self.assertEqual(game.stats.coins, 7)
+                control.publish(force=True)
+                exported = json.loads(control._snapshot)
+                self.assertIn('shop', exported)
+                self.assertNotIn('objects', exported)
+            finally:
+                game.text_control.close()
+                pygame.quit()
+
     def test_real_game_loop_over_http(self):
         # Use the real update/render loop and original speed/cooldown/cap. No
         # real account is loaded, and update checks/stat uploads are disabled.

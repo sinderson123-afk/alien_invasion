@@ -11,3 +11,4 @@ web/.env
 web/*.sqlite3*
 web/*export*.json
 web/.venv/
+training_runs/

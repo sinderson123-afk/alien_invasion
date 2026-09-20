@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pygame
+import shop
 
 from file_crypto import decrypt_json, encrypt_json
 from game_stats import GameState
@@ -22,8 +23,12 @@ def validate_command(data):
     if not isinstance(data, dict) or not data:
         raise ValueError('Expected a nonempty JSON object')
     if 'action' in data:
+        if data['action'] == 'purchase':
+            if set(data) != {'action', 'offer'} or not isinstance(data['offer'], str) or len(data['offer']) > 80:
+                raise ValueError('purchase requires a visible offer identifier')
+            return data
         if set(data) != {'action'} or data['action'] not in (
-                'start', 'pause', 'resume', 'menu', 'back',
+                'start', 'pause', 'resume', 'menu', 'back', 'shop',
                 'missile', 'magnet', 'clover'):
             raise ValueError('Unknown action or extra fields')
         return data
@@ -151,7 +156,7 @@ class TextControl:
         if g.show_notifications or g._account_confirm:
             return []
         if self.ready():
-            result = ['pause']
+            result = ['pause', 'shop']
             if g.stats.missiles > 0:
                 result.append('missile')
             if g.stats.items.get('magnet', 0) > 0 and not g.magnet_active:
@@ -159,9 +164,16 @@ class TextControl:
             if g.stats.items.get('clover', 0) > 0:
                 result.append('clover')
             return result
-        return {GameState.MENU: ['start'], GameState.PAUSED: ['resume', 'menu'],
+        return {GameState.MENU: ['start', 'shop'], GameState.PAUSED: ['resume', 'menu'],
                 GameState.TUTORIAL: ['back'], GameState.LEADERBOARD: ['back'],
-                GameState.SHOP: ['back']}.get(g.state, [])
+                GameState.SHOP: ['back', 'purchase']}.get(g.state, [])
+
+    def offers(self):
+        if self.game.state != GameState.SHOP:
+            return []
+        return [{'id': f'{action}:{key}', 'cost': cost}
+                for action, key, cost, rect in shop.shop_buttons
+                if action in ('buy_item', 'buy_armor', 'upgrade_skill')]
 
     def apply(self, command):
         g = self.game
@@ -184,12 +196,25 @@ class TextControl:
             raise ValueError('Action unavailable in this state or item stock is empty')
         if action == 'start':
             g._start_new_game()
+        elif action == 'purchase':
+            # Refresh the same shop buttons the player sees; never trust a
+            # client-supplied price, item count, upgrade level, or click position.
+            g._update_screen()
+            for verb, key, cost, rect in shop.shop_buttons:
+                if verb in ('buy_item', 'buy_armor', 'upgrade_skill') and f'{verb}:{key}' == command['offer']:
+                    g._check_mouse_click(rect.center)
+                    g._update_screen()
+                    return
+            raise ValueError('Offer unavailable or insufficient coins')
+        elif action == 'shop' and g.state == GameState.MENU:
+            g.previous_state = GameState.MENU
+            g.state = GameState.SHOP
         elif action == 'menu':
             g._return_to_menu()
         else:
             key = {'pause': pygame.K_ESCAPE, 'resume': pygame.K_ESCAPE,
                    'back': pygame.K_ESCAPE, 'missile': pygame.K_e,
-                   'magnet': pygame.K_n, 'clover': pygame.K_c}[action]
+                   'magnet': pygame.K_n, 'clover': pygame.K_c, 'shop': pygame.K_m}[action]
             g._check_keydown_events(pygame.event.Event(pygame.KEYDOWN, key=key))
 
     def pump(self):
@@ -226,8 +251,9 @@ class TextControl:
         return {'id': self._ids[sprite], 'kind': kind,
                 'x': rect.x, 'y': rect.y, 'width': rect.width, 'height': rect.height}
 
-    def publish(self, force=False):
-        self.frame += 1
+    def publish(self, force=False, advance_frame=True):
+        if advance_frame:
+            self.frame += 1
         now = time.monotonic()
         if not force and now < self._next_snapshot:
             return
@@ -241,6 +267,10 @@ class TextControl:
                              'lease_remaining_ms': max(0, round((self.expires - now) * 1000))}}
         if g.state == GameState.MENU:
             state['hud'] = {'coins': g.stats.coins, 'best': g.stats.high_score}
+        if g.state == GameState.SHOP:
+            state['hud'] = {'coins': g.stats.coins, 'hp': g.stats.ship_hp, 'max_hp': g.stats.max_hp}
+            state['shop'] = {'offers': self.offers(), 'items': dict(g.stats.items),
+                             'skills': dict(g.stats.skills), 'armor': g.stats.armor_tier}
         if g.state in (GameState.PLAYING, GameState.PAUSED):
             state['hud'] = {'hp': g.stats.ship_hp, 'max_hp': g.stats.max_hp,
                             'score': g.stats.score, 'best': g.stats.high_score,

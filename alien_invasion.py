@@ -436,6 +436,7 @@ class AlienInvasion:
                 self._quit_game()
 
         elif self.state == GameState.SHOP:
+            previous_speed_level = self.stats.skills['speed']
             result = shop.handle_shop_click(
                 mouse_pos, self.stats, self.settings, ai_game=self)
             if isinstance(result, tuple) and len(result) == 3 and result[1] == 'tab_switch':
@@ -446,7 +447,7 @@ class AlienInvasion:
                     self.state = self.previous_state
                 elif changed:
                     self.sb.prep_coins()
-                    self._apply_skills()
+                    self._apply_skills(previous_speed_level=previous_speed_level)
 
         elif self.state == GameState.TUTORIAL:
             action = self.menu_system.handle_tutorial_click(mouse_pos)
@@ -484,11 +485,11 @@ class AlienInvasion:
             text = self._font_row_bell.render(label, True, (235, 240, 250))
             self.screen.blit(text, text.get_rect(center=rect.center))
 
-    def _apply_skills(self):
+    def _apply_skills(self, previous_speed_level=0):
         """Adjust game settings by skill levels (called after initialize_dynamic_settings)"""
         skills = self.stats.skills
         s = self.settings
-        s.ship_speed *= (1 + skills['speed'] * 0.1)
+        s.ship_speed *= (1 + skills['speed'] * 0.1) / (1 + previous_speed_level * 0.1)
         if s.ship_speed > s.ship_speed_max:
             s.ship_speed = s.ship_speed_max
         s.bullet_allowed = 3 + skills['ammo']

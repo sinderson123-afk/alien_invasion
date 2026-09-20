@@ -47,8 +47,9 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('state')
     act = commands.add_parser('act')
-    act.add_argument('--action', choices=['start', 'pause', 'resume', 'menu', 'back',
+    act.add_argument('--action', choices=['start', 'pause', 'resume', 'menu', 'back', 'shop', 'purchase',
                                           'missile', 'magnet', 'clover'])
+    act.add_argument('--offer')
     act.add_argument('--move', choices=['left', 'right', 'stop'])
     act.add_argument('--fire', choices=['on', 'off'])
     act.add_argument('--lease-ms', type=int)
@@ -59,7 +60,7 @@ def main():
             result = client.state()
         else:
             data = {k: v for k, v in vars(args).items()
-                    if k in ('action', 'move', 'fire', 'lease_ms') and v is not None}
+                    if k in ('action', 'offer', 'move', 'fire', 'lease_ms') and v is not None}
             if 'fire' in data:
                 data['fire'] = data['fire'] == 'on'
             result = client.act(**data)

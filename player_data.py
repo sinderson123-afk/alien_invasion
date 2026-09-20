@@ -2,6 +2,7 @@
 
 import sys
 import os
+from copy import deepcopy
 from pathlib import Path
 from file_crypto import encrypt_json, decrypt_json
 
@@ -32,7 +33,7 @@ class PlayerData:
     def load(self):
         data = decrypt_json(self.file_path)
         if data is None:
-            return dict(_DEFAULTS)
+            return deepcopy(_DEFAULTS)
 
         skills = dict(_DEFAULTS['skills'])
         skills.update(data.get('skills', {}))

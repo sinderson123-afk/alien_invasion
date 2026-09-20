@@ -55,6 +55,8 @@ if state['accepts_controls']:
 | `pause` / `resume` | 暂停当前游戏 / 继续暂停的游戏 |
 | `menu` | 暂停菜单，按原有逻辑结算并回主菜单 |
 | `back` | 退出教程、排行榜或商店 |
+| `shop` | 主菜单或正常战斗中打开商店 |
+| `purchase` | 仅在商店中，附带 `offer` 字段，购买当前可见且可负担的商品 |
 | `missile` | 消耗一枚已有导弹 |
 | `magnet` / `clover` | 消耗对应的已有道具 |
 
@@ -76,6 +78,8 @@ if state['accepts_controls']:
 对象类型包括 `alien`、`boss`、`bullet`、`missile`、`hostile_bullet`、`hostile_missile`、`meteor`、`meteor_fragment`、`coin`、`gem`。不返回 AI 状态、目标坐标、随机数、未来出生位置或计时器。过场隐藏对象列表；菜单、登录及商店不导出战斗对象。敌人的速度可由相邻观测的位置差自行估算。
 
 ## 本地 HTTP 协议
+
+商店返回 `shop.offers`（商品标识和价格）、当前技能等级、物品库存和护甲；购买示例：`game.act(action='purchase', offer='upgrade_skill:ammo')`。接口不接受客户端价格或数量，调用同一套商店按钮与扣款逻辑。神经网络训练和实战见 [NEURAL_PILOT.md](NEURAL_PILOT.md)。
 
 默认仅监听 `127.0.0.1:8765`，普通启动不开启接口。可用 `--text-control 8766` 换端口，或传 `0` 自动分配端口。
 
